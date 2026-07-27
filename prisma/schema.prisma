@@ -1,0 +1,1250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement()) @db.UnsignedInt
+  nokp        String?   @db.VarChar(20)
+  nama        String?   @db.VarChar(200)
+  uname       String?   @db.VarChar(20)
+  pass        String?   @db.VarChar(200)
+  levelAkses  Int?      @map("level_akses")
+  idCawangan  String?   @map("id_cawangan") @db.VarChar(10)
+  last_login  DateTime? @db.DateTime(0)
+  catatan     String?   @db.VarChar(20)
+  statusLogin Int?      @map("status_login")
+
+  @@index([idCawangan], map: "id_cawangan")
+  @@map("users")
+}
+
+model Cawangan {
+  id               Int       @id @default(autoincrement()) @db.UnsignedInt
+  idCawangan       String?   @map("id_cawangan") @db.VarChar(20)
+  namaCawangan     String    @map("nama_cawangan") @db.VarChar(200)
+  alamat1          String?   @db.VarChar(255)
+  alamat2          String?   @db.VarChar(255)
+  alamat3          String?   @db.VarChar(255)
+  alamat4          String?   @db.VarChar(200)
+  noTelefon        String?   @map("no_telefon") @db.VarChar(20)
+  no_faks          String?   @db.VarChar(20)
+  negeri           String?   @db.VarChar(10)
+  daerah           String?   @db.VarChar(10)
+  bil_kaunter      Int?
+  player_id        String?   @db.VarChar(200)
+  create_date      DateTime? @db.DateTime(0)
+  latitud          String?   @db.VarChar(50)
+  longitud         String?   @db.VarChar(50)
+  update_date      DateTime? @db.DateTime(0)
+  update_by        String?   @db.VarChar(20)
+  sela_masa        Int?
+  flag             String?   @db.VarChar(5)
+  jenis_limit      Int?
+  tempoh_mula_scan Int?
+  status_eq        Int?      @default(0)
+  radius           Int?
+  kodQR            String?   @db.VarChar(200)
+  tarikh_jana      DateTime? @db.DateTime(0)
+  nama_qr          String?   @db.VarChar(250)
+  gambar_qr        String?   @db.Text
+
+  @@map("cawangan")
+}
+
+model Perkhidmatan {
+  id         Int     @id @default(autoincrement()) @db.UnsignedInt
+  keterangan String? @db.VarChar(500)
+
+  @@map("perkhidmatan")
+}
+
+model KumpulanPerkhidmatan {
+  id             Int       @id @default(autoincrement()) @db.UnsignedInt
+  idPerkhidmatan String?   @map("id_perkhidmatan") @db.Text
+  idCawangan     String?   @map("id_cawangan") @db.VarChar(20)
+  keterangan     String?   @db.VarChar(255)
+  noSiri         Int       @map("no_siri")
+  noTerkini      Int       @map("no_terkini")
+  kategori       Int       @default(1)
+  isPelbagai     Int?      @default(0) @map("ispelbagai")
+  createDate     DateTime? @map("create_date") @db.DateTime(0)
+  status         Int?      @default(1)
+
+  @@index([idCawangan], map: "id_cawangan")
+  @@map("kumpulan_perkhidmatan")
+}
+
+model Kaunter {
+  id                     Int       @id @default(autoincrement()) @db.UnsignedInt
+  noKaunter              String?   @map("no_kaunter") @db.VarChar(11)
+  namaKaunter            String?   @map("nama_kaunter") @db.VarChar(100)
+  idPerkhidmatanKumpulan Int?      @map("id_perkhidmatan_kumpulan")
+  idCawangan             String?   @map("id_cawangan") @db.VarChar(20)
+  noSiri                 Int?      @map("no_siri")
+  susunanKeutamaan       String?   @map("susunan_keutamaan") @db.VarChar(35)
+  idPengguna             String?   @map("id_pengguna") @db.VarChar(11)
+  transid                String?   @db.VarChar(20)
+  no_tiket               Int?
+  masa_panggil           DateTime? @db.DateTime(0)
+  masa_selesai           DateTime? @db.DateTime(0)
+  masa_batal             DateTime? @db.DateTime(0)
+  bilangan_pelanggan     Int?
+  masa_menunggu          DateTime? @db.Time(0)
+  waktuMula              DateTime? @map("waktu_mula") @db.DateTime(0)
+  zon                    String?   @db.VarChar(25)
+
+  @@map("kaunter")
+}
+
+model Zon {
+  id       Int    @id @default(autoincrement())
+  cawangan String @db.VarChar(10)
+  zon      String @db.VarChar(25)
+  catatan  String @db.VarChar(50)
+
+  @@map("zon")
+}
+
+model JadualTugasan {
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  nokp         String?   @db.VarChar(20)
+  idKaunter    Int?      @map("id_kaunter")
+  id_cawangan  String?   @db.VarChar(10)
+  tarikh_mula  DateTime? @db.Date
+  tarikh_tamat DateTime? @db.Date
+  status_aktif Int?      @default(1)
+  create_date  DateTime? @db.DateTime(0)
+  update_date  DateTime  @default(now()) @db.Timestamp(0)
+
+  @@map("jadual_tugasan")
+}
+
+model TempahanTarikh {
+  id               Int     @id @default(autoincrement())
+  cawangan         String? @db.VarChar(100)
+  kumpPerkhidmatan String? @map("kump_perkhidmatan") @db.VarChar(20)
+  hadMax           String? @map("had_max") @db.VarChar(5)
+  tarikh           String? @db.VarChar(20)
+  status           Int?    @default(0)
+  cttmBatal        String? @map("cttn_batal") @db.Text
+  nyahaktif        Int?
+  buka_tempahan    Int?
+
+  @@index([cawangan], map: "cawangan")
+  @@index([kumpPerkhidmatan], map: "kump_perkhidmatan")
+  @@map("tempahan_tarikh")
+}
+
+model TempahanMasa {
+  id               Int     @id @default(autoincrement())
+  cawangan         String? @db.VarChar(200)
+  kumpPerkhidmatan String? @map("kump_perkhidmatan") @db.VarChar(30)
+  tarikh           String? @db.VarChar(30)
+  masa             String? @db.VarChar(30)
+  bilangan         Int?
+  status           Int?
+  bilTlhIsi        Int?    @default(0) @map("bil_tlh_isi")
+  buka_tempahan    Int?
+
+  @@index([cawangan], map: "cawangan")
+  @@index([kumpPerkhidmatan], map: "kump_perkhidmatan")
+  @@map("tempahan_masa")
+}
+
+model TempahanList {
+  id              Int       @id @default(autoincrement())
+  tempahanMasaId  Int?      @map("tempahan_masa_id")
+  cawangan        String?   @db.VarChar(100)
+  urusniaga       Int?
+  kategori        Int?
+  nopengenalan    String?   @db.VarChar(20)
+  nama            String?   @db.VarChar(200)
+  notelefon       String?   @db.VarChar(20)
+  emel            String?   @db.VarChar(50)
+  playerId        String?   @map("player_id") @db.VarChar(100)
+  hash            String?   @db.VarChar(100)
+  isPending       Int?      @map("is_pending")
+  createDate      DateTime? @map("create_date") @db.DateTime(0)
+  batal           String?   @db.VarChar(3)
+  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
+  webToken        String?   @map("web_token") @db.VarChar(100)
+  firstId         Int?      @map("first_id")
+  firstMasaId     Int?      @map("first_masa_id")
+  tempId          Int?      @map("temp_id")
+
+  @@index([cawangan], map: "cawangan")
+  @@index([kategori], map: "kategori")
+  @@index([nopengenalan], map: "nopengenalan")
+  @@index([tempahanMasaId], map: "tempahan_masa_id")
+  @@map("tempahan_list")
+}
+
+model TempahanBatal {
+  id              Int       @id @default(autoincrement())
+  idTempahan      Int?      @map("id_tempahan")
+  tempahanMasaId  Int?      @map("tempahan_masa_id")
+  cawangan        String?   @db.VarChar(100)
+  urusniaga       Int?
+  kategori        Int?
+  nopengenalan    String?   @db.VarChar(20)
+  nama            String?   @db.VarChar(200)
+  notelefon       String?   @db.VarChar(20)
+  emel            String?   @db.VarChar(50)
+  playerId        String?   @map("player_id") @db.VarChar(100)
+  hash            String?   @db.VarChar(100)
+  isPending       Int?      @map("is_pending")
+  createDate      DateTime? @map("create_date") @db.DateTime(0)
+  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
+  webToken        String?   @map("web_token") @db.VarChar(100)
+  firstId         Int?      @map("first_id")
+  firstMasaId     Int?      @map("first_masa_id")
+  remarks         String?   @db.VarChar(255)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([kategori], map: "kategori")
+  @@index([nopengenalan], map: "nopengenalan")
+  @@index([tempahanMasaId], map: "tempahan_masa_id")
+  @@map("tempahan_batal")
+}
+
+model HadTemujanji {
+  id           Int     @id @default(autoincrement())
+  cawangan     String? @db.VarChar(10)
+  bilTemujanji Int?    @map("bil_temujanji")
+  bilPlayerId  Int?    @map("bil_player_id")
+
+  @@map("had_temujanji")
+}
+
+model HadPelanggan {
+  id                    Int     @id @default(autoincrement()) @db.UnsignedInt
+  cawangan              String  @db.VarChar(20)
+  bahagian              String? @db.VarChar(20)
+  kumpulan_perkhidmatan String? @db.VarChar(20)
+  bilanganPelanggan     Int     @default(0) @map("bilangan_pelanggan")
+  statusAktif           Int     @default(1) @map("status_aktif")
+  had_pelanggan1        Int     @default(0)
+  had_pelanggan2        Int     @default(0)
+  had_pelanggan3        Int     @default(0)
+  jenis_limit           Int?    @default(1)
+  tempoh_mula_scan      Int     @default(0)
+
+  @@map("had_pelanggan")
+}
+
+model WaktuOperasi {
+  id          Int       @id @default(autoincrement()) @db.UnsignedInt
+  cawangan    String?   @db.VarChar(20)
+  namaHari    String?   @map("nama_hari") @db.VarChar(3)
+  waktuMula   DateTime? @map("waktu_mula") @db.Time(0)
+  waktuTamat  DateTime? @map("waktu_tamat") @db.Time(0)
+  sesi        Int?
+  statusAktif Int       @default(1) @map("status_aktif")
+  createDate  DateTime? @map("create_date") @db.DateTime(0)
+  updateDate  DateTime? @map("update_date") @db.DateTime(0)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([namaHari], map: "nama_hari")
+  @@map("waktu_operasi")
+}
+
+model HariCuti {
+  id         Int      @id @default(autoincrement()) @db.UnsignedInt
+  cawangan   String?  @db.VarChar(20)
+  namaHari   String?  @map("nama_hari") @db.VarChar(3)
+  createDate DateTime @default(now()) @map("create_date") @db.Timestamp(0)
+
+  @@map("hari_cuti")
+}
+
+model CutiUmum {
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  cawangan     String?   @db.VarChar(20)
+  tarikh1      DateTime? @map("tarikh_1") @db.Date
+  status_aktif Int       @default(1)
+  create_date  DateTime  @default(now()) @db.Timestamp(0)
+  keterangan   String?   @db.VarChar(200)
+  negeri       String?   @db.VarChar(10)
+  updateby     String?   @db.VarChar(20)
+  updatedate   DateTime? @db.DateTime(0)
+
+  @@map("cuti_umum")
+}
+
+model Pengumuman {
+  id       Int      @id @default(autoincrement())
+  cawangan String   @db.VarChar(10)
+  catatan  String   @db.Text
+  trhMula  DateTime @map("trh_mula") @db.Date
+  trhTamat DateTime @map("trh_tamat") @db.Date
+
+  @@map("pengumuman")
+}
+
+model kaunter_stat {
+  id                      Int       @id @default(autoincrement())
+  cawangan                String?   @db.VarChar(20)
+  tarikh                  DateTime? @db.Date
+  kaunter                 String?   @db.VarChar(10)
+  bil_tiket               Int?
+  bil_selesai             Int?
+  bil_batal               Int?
+  bil_lain                Int?
+  batal_cust              Int?
+  batal_kaunter           Int?
+  purata_masa_menunggu    DateTime? @db.Time(0)
+  purata_masa_layanan     DateTime? @db.Time(0)
+  masa_menunggu_terlama   DateTime? @db.Time(0)
+  masa_layanan_terlama    DateTime? @db.Time(0)
+  jumlah_masa_keseluruhan DateTime? @db.Time(0)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+model level_akses {
+  id           Int     @id @default(autoincrement())
+  keterangan   String? @db.VarChar(200)
+  status_aktif Int?    @default(1)
+}
+
+model log_jadual_tugasan {
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  nokp         String?   @db.VarChar(20)
+  id_kaunter   Int?
+  id_cawangan  String?   @db.VarChar(10)
+  tarikh_mula  DateTime? @db.Date
+  tarikh_tamat DateTime? @db.Date
+  create_date  DateTime? @db.DateTime(0)
+  update_date  DateTime  @default(now()) @db.Timestamp(0)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model log_tiket {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+  @@index([uuid], map: "idx_uuid")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model log_transaksi {
+  id        Int       @id @default(autoincrement()) @db.UnsignedInt
+  ip        String?   @db.VarChar(100)
+  device    String?   @db.VarChar(255)
+  tarikh    DateTime? @db.DateTime(0)
+  direction Int?
+  module    String?   @db.VarChar(200)
+  data      String?   @db.Text
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model log_transaksi_masamenunggu {
+  id        Int       @id @default(autoincrement()) @db.UnsignedInt
+  ip        String?   @db.VarChar(100)
+  device    String?   @db.VarChar(255)
+  tarikh    DateTime? @db.DateTime(0)
+  direction Int?
+  module    String?   @db.VarChar(200)
+  data      String?   @db.Text
+}
+
+model peralatan {
+  id        Int     @id @default(autoincrement()) @db.UnsignedInt
+  player_id String? @db.VarChar(200)
+  ip        String? @db.VarChar(100)
+}
+
+model perkhidmatan_stat {
+  id                      Int       @id @default(autoincrement())
+  cawangan                String?   @db.VarChar(20)
+  tarikh                  DateTime? @db.Date
+  kumpulan_perkhidmatan   String?   @db.VarChar(10)
+  keterangan              String?   @db.VarChar(200)
+  bil_tiket               Int?
+  bil_selesai             Int?
+  bil_batal               Int?
+  bil_lain                Int?
+  batal_cust              Int?
+  batal_kaunter           Int?
+  purata_masa_menunggu    DateTime? @db.Time(0)
+  purata_masa_layanan     DateTime? @db.Time(0)
+  masa_menunggu_terlama   DateTime? @db.Time(0)
+  masa_layanan_terlama    DateTime? @db.Time(0)
+  jumlah_masa_keseluruhan DateTime? @db.Time(0)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+model ref {
+  id         Int     @id @default(autoincrement())
+  kod        String  @db.VarChar(20)
+  keterangan String  @db.VarChar(255)
+  nilai      String? @db.VarChar(100)
+  jenis      Int
+}
+
+model tempahan_list_temp {
+  id               Int       @id @default(autoincrement())
+  id_list          Int?
+  tempahan_masa_id Int?
+  cawangan         String?   @db.VarChar(100)
+  urusniaga        Int?
+  kategori         Int?
+  nopengenalan     String?   @db.VarChar(20)
+  nama             String?   @db.VarChar(200)
+  notelefon        String?   @db.VarChar(20)
+  emel             String?   @db.VarChar(50)
+  player_id        String?   @db.VarChar(100)
+  hash             String?   @db.VarChar(100)
+  is_pending       Int?
+  create_date      DateTime? @db.DateTime(0)
+  batal            Int?
+  tujuan_transaksi String?   @db.VarChar(255)
+  web_token        String?   @db.VarChar(100)
+  first_id         Int?
+  first_masa_id    Int?
+}
+
+model tempahan_rate {
+  id          Int      @id @default(autoincrement())
+  id_tempahan Int
+  rate        Int
+  comment     String?  @db.Text
+  create_date DateTime @db.DateTime(0)
+}
+
+model tempahan_temp {
+  id               Int       @id @default(autoincrement())
+  tempahan_masa_id Int?
+  cawangan         String?   @db.VarChar(100)
+  urusniaga        Int?
+  kategori         Int?
+  nopengenalan     String?   @db.VarChar(20)
+  nama             String?   @db.VarChar(200)
+  notelefon        String?   @db.VarChar(20)
+  emel             String?   @db.VarChar(50)
+  player_id        String?   @db.VarChar(100)
+  hash             String?   @db.VarChar(100)
+  is_pending       Int?
+  create_date      DateTime? @db.DateTime(0)
+  batal            Int?
+  tujuan_transaksi String?   @db.VarChar(255)
+  web_token        String?   @db.VarChar(100)
+  first_id         Int?
+  first_masa_id    Int?
+  temp_id          Int?
+  update_list      Int?
+
+  @@index([cawangan], map: "cawangan")
+  @@index([kategori], map: "kategori")
+  @@index([nopengenalan], map: "nopengenalan")
+  @@index([tempahan_masa_id], map: "tempahan_masa_id")
+}
+
+model tempahan_temp2 {
+  id               Int       @id @default(autoincrement())
+  tempahan_masa_id Int?
+  cawangan         String?   @db.VarChar(100)
+  urusniaga        Int?
+  kategori         Int?
+  nopengenalan     String?   @db.VarChar(20)
+  nama             String?   @db.VarChar(200)
+  notelefon        String?   @db.VarChar(20)
+  emel             String?   @db.VarChar(50)
+  player_id        String?   @db.VarChar(100)
+  hash             String?   @db.VarChar(100)
+  is_pending       Int?
+  create_date      DateTime? @db.DateTime(0)
+  batal            Int?
+  tujuan_transaksi String?   @db.VarChar(255)
+  web_token        String?   @db.VarChar(100)
+  first_id         Int?
+  first_masa_id    Int?
+  update_list      Int?
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_01 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_02 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_03 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_04 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_05 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_06 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_07 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               String?   @db.VarChar(11)
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         String?   @default("0") @db.VarChar(11)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_08 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_09 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_10 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               String?   @db.VarChar(11)
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         String?   @default("0") @db.VarChar(11)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_11 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_12 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_13 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_14 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_15 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tiket_16 {
+  id                    Int       @id @default(autoincrement()) @db.UnsignedInt
+  transid               String?   @db.VarChar(50)
+  no_tiket              Int?
+  no_siri               Int
+  tarikh                DateTime? @db.DateTime(0)
+  kaunter               Int?
+  cawangan              String?   @db.VarChar(20)
+  kumpulan_perkhidmatan Int?
+  player_id             String?   @db.VarChar(100)
+  create_date           DateTime? @db.DateTime(0)
+  call_date             DateTime? @db.DateTime(0)
+  transfer_date         DateTime? @db.DateTime(0)
+  end_date              DateTime? @db.DateTime(0)
+  cancel_date           DateTime? @db.DateTime(0)
+  active_date           DateTime? @db.DateTime(0)
+  request_by            Int?      @default(1)
+  catatan               String?   @db.Text
+  status_tiket          Int?      @default(0)
+  batal_oleh            Int       @default(0)
+  ip                    String?   @db.VarChar(100)
+  bilangan_panggil      Int?      @default(0)
+  transfer_from         Int?      @default(0)
+  masa_menunggu         DateTime? @db.Time(0)
+  masa_layanan          DateTime? @db.Time(0)
+  jumlah_masa           DateTime? @db.Time(0)
+  update_date           DateTime  @default(now()) @db.Timestamp(0)
+  sesi                  Int
+  perkhidmatan_khas     String?   @db.VarChar(5)
+  jenis_tiket           Int?
+  uuid                  String?   @db.VarChar(100)
+
+  @@unique([cawangan, id], map: "cawangan")
+  @@unique([kaunter, id], map: "kaunter")
+  @@unique([kumpulan_perkhidmatan, id], map: "kumpulan_perkhidmatan")
+  @@unique([no_siri, id], map: "no_siri")
+  @@unique([no_tiket, id], map: "no_tiket")
+}
+
+model tiket_stat {
+  id                      Int       @id @default(autoincrement())
+  cawangan                String?   @db.VarChar(20)
+  tarikh                  DateTime? @db.Date
+  bil_tiket               Int?
+  bil_selesai             Int?
+  bil_batal               Int?
+  bil_lain                Int?
+  batal_cust              Int?
+  batal_kaunter           Int?
+  purata_masa_menunggu    String?   @db.VarChar(30)
+  purata_masa_layanan     String?   @db.VarChar(30)
+  masa_menunggu_terlama   String?   @db.VarChar(30)
+  masa_layanan_terlama    String?   @db.VarChar(30)
+  jumlah_masa_keseluruhan String?   @db.VarChar(30)
+  masa_awal               DateTime? @db.Time(0)
+  masa_akhir              DateTime? @db.Time(0)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+model tiket_stat_copy {
+  id                      Int       @id @default(autoincrement())
+  cawangan                String?   @db.VarChar(20)
+  tarikh                  DateTime? @db.Date
+  bil_tiket               Int?
+  bil_selesai             Int?
+  bil_batal               Int?
+  bil_lain                Int?
+  batal_cust              Int?
+  batal_kaunter           Int?
+  purata_masa_menunggu    String?   @db.VarChar(30)
+  purata_masa_layanan     String?   @db.VarChar(30)
+  masa_menunggu_terlama   String?   @db.VarChar(30)
+  masa_layanan_terlama    String?   @db.VarChar(30)
+  jumlah_masa_keseluruhan String?   @db.VarChar(30)
+  masa_awal               DateTime? @db.Time(0)
+  masa_akhir              DateTime? @db.Time(0)
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+model tiket_stat_hour {
+  id                   Int       @id @default(autoincrement())
+  cawangan             String?   @db.VarChar(20)
+  tarikh               DateTime? @db.Date
+  bil_tiket            Int?
+  bil_tiket_batal_cust Int?
+  masa                 String?   @db.VarChar(5)
+  jum                  Int?
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+model tiket_stat_utc {
+  id                   Int       @id @default(autoincrement())
+  cawangan             String?   @db.VarChar(20)
+  tarikh               DateTime? @db.Date
+  bil_tiket            Int?
+  bil_tiket_batal_cust Int?
+  masa                 String?   @db.VarChar(5)
+  jum                  Int?
+
+  @@index([cawangan], map: "cawangan")
+  @@index([tarikh], map: "tarikh")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tref_branch {
+  REFBR_BRANCH_ID      String?   @db.Char(7)
+  REFBR_AGENCY_CODE    String?   @db.Char(2)
+  REFBR_STATE_CODE     String?   @db.Char(2)
+  REFBR_BRANCH_CODE    String?   @db.Char(2)
+  REFBR_USAGE_CODE     String?   @db.Char(1)
+  REFBR_NAME           String?   @db.Char(80)
+  REFBR_ADDRESS1       String?   @db.Char(40)
+  REFBR_ADDRESS2       String?   @db.Char(40)
+  REFBR_ADDRESS3       String?   @db.Char(40)
+  REFBR_POSTCODE       String?   @db.Char(5)
+  REFBR_CITY           String?   @db.Char(4)
+  REFBR_STATE          String?   @db.Char(2)
+  REFBR_COUNTRY        String?   @db.Char(3)
+  REFBR_TELNO          String?   @db.Char(14)
+  REFBR_EMAIL          String?   @db.Char(100)
+  REFBR_CONTACT_PERSON String?   @db.Char(80)
+  REFBR_CREATE_BRANCH  String?   @db.Char(7)
+  REFBR_UPDATE_BRANCH  String?   @db.Char(7)
+  REFBR_CREATE_USER    String?   @db.Char(12)
+  REFBR_CREATE_DATE    DateTime? @db.Date
+  REFBR_UPDATE_USER    String?   @db.Char(12)
+  REFBR_UPDATE_DATE    DateTime? @db.Date
+  REFBR_MASTER_BR_ID   String?   @db.Char(7)
+  REFBR_EA_SHORT_CODE  String?   @db.Char(3)
+  REFBR_FAX_NO         String?   @db.Char(14)
+  REFBR_DISTRICT_CODE  String?   @db.Char(5)
+  REFBR_STATUS         String?   @db.Char(1)
+  REFBR_ADDRESS4       String?   @db.Char(40)
+  REFBR_ADDRESS5       String?   @db.Char(40)
+  REFBR_REMARK         String?   @db.Char(25)
+
+  @@ignore
+}

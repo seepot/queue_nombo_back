@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Realtime display hook
+
+The `POST /api/kaunter/action` route best-effort publishes `seterusnya` calls to a separate realtime service.
+
+Required env vars:
+
+- `REALTIME_SERVICE_URL` such as `http://localhost:4001`
+- `REALTIME_SERVICE_SECRET` matching the NestJS service secret

@@ -38,11 +38,11 @@ export async function POST(req: NextRequest) {
       alamat1: body.alamat1 || body.alamat || null,
       negeri: body.negeri || null,
       noTelefon: body.noTelefon || null,
-      no_faks: body.noFaks || null,
+      noFaks: body.noFaks || null,
       latitud: body.latitud || null,
       longitud: body.longitud || null,
       flag: body.giliran || "1",
-      create_date: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      createDate: new Date(Date.now() + 8 * 60 * 60 * 1000),
     },
   });
 
@@ -67,7 +67,7 @@ export async function PUT(req: NextRequest) {
       alamat4: body.alamat4 || null,
       negeri: body.negeri || null,
       noTelefon: body.noTelefon || null,
-      no_faks: body.no_faks || null,
+      noFaks: body.noFaks || body.no_faks || null,
       latitud: body.latitud || null,
       longitud: body.longitud || null,
       flag: body.flag !== undefined ? body.flag : undefined,

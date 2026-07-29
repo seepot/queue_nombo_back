@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const transId = searchParams.get("transId");
 
   if (transId) {
-    const tiket = await prisma.log_tiket.findFirst({
+    const tiket = await prisma.logTiket.findFirst({
       where: { transid: transId },
     });
     return NextResponse.json(tiket ? { ...tiket, id: Number(tiket.id) } : null);
@@ -87,19 +87,19 @@ export async function POST(req: NextRequest) {
     .digest("hex");
 
   // Create ticket in log_tiket
-  await prisma.log_tiket.create({
+  await prisma.logTiket.create({
     data: {
       transid: transId,
-      no_tiket: newNoTiket,
-      no_siri: noSiri,
+      noTiket: newNoTiket,
+      noSiri: noSiri,
       tarikh: new Date(Date.now() + 8 * 60 * 60 * 1000),
       cawangan: String(cawangan),
-      kumpulan_perkhidmatan: Number(idKumpulanPerkhidmatan),
-      player_id: playerId,
-      status_tiket: 0,
-      create_date: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      kumpulanPerkhidmatan: Number(idKumpulanPerkhidmatan),
+      playerId: playerId,
+      statusTiket: 0,
+      createDate: new Date(Date.now() + 8 * 60 * 60 * 1000),
       sesi: 1,
-      update_date: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      updateDate: new Date(Date.now() + 8 * 60 * 60 * 1000),
     },
   });
 
@@ -110,18 +110,18 @@ export async function POST(req: NextRequest) {
   });
 
   // Get current serving number
-  const currentServing = await prisma.log_tiket.findFirst({
+  const currentServing = await prisma.logTiket.findFirst({
     where: {
       cawangan: String(cawangan),
-      no_siri: noSiri,
-      status_tiket: 4,
+      noSiri: noSiri,
+      statusTiket: 4,
     },
-    orderBy: { call_date: "desc" },
+    orderBy: { callDate: "desc" },
   });
 
   return NextResponse.json({
     no_tiket_anda: newNoTiket,
-    no_sekarang: currentServing?.no_tiket || 0,
+    no_sekarang: currentServing?.noTiket || 0,
     no_siri: noSiri,
     transid: transId,
   });
@@ -138,21 +138,21 @@ export async function PUT(req: NextRequest) {
   const { transId, status } = body;
 
   const updateData: Record<string, unknown> = {
-    status_tiket: Number(status),
+    statusTiket: Number(status),
   };
 
   if (Number(status) === 2) {
     // Called
-    updateData.call_date = new Date();
+    updateData.callDate = new Date();
     updateData.kaunter = session.user.noKaunter
       ? Number(session.user.noKaunter)
       : null;
   } else if (Number(status) === 4) {
     // Completed
-    updateData.end_date = new Date();
+    updateData.endDate = new Date();
   }
 
-  await prisma.log_tiket.updateMany({
+  await prisma.logTiket.updateMany({
     where: { transid: transId },
     data: updateData,
   });

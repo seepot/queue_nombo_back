@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-MY");
+}
 
 interface ReportRow {
   tarikh?: string;
@@ -97,15 +104,28 @@ export default function LaporanPerkhidmatanPage() {
       </div>
 
       {data.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Graf Transaksi</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data.map((row) => ({ label: getRowLabel(row), Tiket: row.bil_tiket, Selesai: row.bil_selesai, Batal: row.batal_cust + row.batal_kaunter }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="Tiket" fill="#3b82f6" />
+              <Bar dataKey="Selesai" fill="#22c55e" />
+              <Bar dataKey="Batal" fill="#ef4444" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {data.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">{tajuk}</h3>
-            <button
-              onClick={() => window.print()}
-              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition"
-            >
-              Cetak
-            </button>
+            <button onClick={() => window.print()} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition">Cetak</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -128,20 +148,20 @@ export default function LaporanPerkhidmatanPage() {
                   <tr key={idx} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{idx + 1}</td>
                     <td className="px-4 py-3">{getRowLabel(row)}</td>
-                    <td className="px-4 py-3 text-center">{row.bil_tiket}</td>
-                    <td className="px-4 py-3 text-center">{row.bil_selesai}</td>
-                    <td className="px-4 py-3 text-center">{row.batal_cust}</td>
-                    <td className="px-4 py-3 text-center">{row.batal_kaunter}</td>
-                    <td className="px-4 py-3 text-center">{row.batal_cust + row.batal_kaunter}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.bil_tiket)}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.bil_selesai)}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.batal_cust)}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.batal_kaunter)}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.batal_cust + row.batal_kaunter)}</td>
                   </tr>
                 ))}
                 <tr className="bg-gray-100 font-semibold">
                   <td className="px-4 py-3 text-right" colSpan={2}>Jumlah</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.bil_tiket, 0)}</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.bil_selesai, 0)}</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.batal_cust, 0)}</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.batal_kaunter, 0)}</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.batal_cust + r.batal_kaunter, 0)}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.bil_tiket, 0))}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.bil_selesai, 0))}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.batal_cust, 0))}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.batal_kaunter, 0))}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.batal_cust + r.batal_kaunter, 0))}</td>
                 </tr>
               </tbody>
             </table>

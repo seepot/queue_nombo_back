@@ -19,7 +19,7 @@ export async function PUT(req: NextRequest) {
       alamat3: body.alamat3 || null,
       alamat4: body.alamat4 || null,
       noTelefon: body.noTelefon || null,
-      no_faks: body.no_faks || null,
+      noFaks: body.noFaks || body.no_faks || null,
       radius: body.radius != null ? Number(body.radius) : null,
     },
   });

@@ -22,8 +22,8 @@ export default async function QRCodePage() {
       <QRCodeClient
         idCawangan={session.user.idCawangan}
         namaCawangan={cawangan?.namaCawangan || ""}
-        gambarQR={cawangan?.gambar_qr || null}
-        tarikhJana={cawangan?.tarikh_jana ? cawangan.tarikh_jana.toISOString() : null}
+        gambarQR={cawangan?.gambarQr || null}
+        tarikhJana={cawangan?.tarikhJana ? cawangan.tarikhJana.toISOString() : null}
       />
     </div>
   );

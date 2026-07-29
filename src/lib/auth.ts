@@ -48,26 +48,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           : null;
 
         // Look up kaunter assignment (from jadual_tugasan)
-        const kaunterData = await prisma.$queryRawUnsafe<
+        const kaunterData = await prisma.$queryRaw<
           Array<{
             id_kaunter: number;
             no_kaunter: string | null;
             nama_kaunter: string | null;
             susunan_keutamaan: string | null;
           }>
-        >(
-          `SELECT k.id as id_kaunter, k.no_kaunter, k.nama_kaunter, k.susunan_keutamaan
+        >`
+          SELECT k.id as id_kaunter, k.no_kaunter, k.nama_kaunter, k.susunan_keutamaan
            FROM kaunter k INNER JOIN jadual_tugasan j ON j.id_kaunter = k.id
-           WHERE j.nokp = ? LIMIT 1`,
-          username
-        );
+           WHERE j.nokp = ${username} LIMIT 1
+        `;
 
         const kaunter = kaunterData[0] || null;
 
         // Update last login
         await prisma.user.update({
           where: { id: user.id },
-          data: { last_login: new Date(Date.now() + 8 * 60 * 60 * 1000) },
+          data: { lastLogin: new Date(Date.now() + 8 * 60 * 60 * 1000) },
         });
 
         return {

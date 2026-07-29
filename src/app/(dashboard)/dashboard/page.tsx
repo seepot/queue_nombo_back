@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import KaunterDashboardClient from "./KaunterDashboardClient";
 import PrinterDashboardClient from "./PrinterDashboardClient";
 import QRDisplayClient from "./QRDisplayClient";
+import AdminTransactionChart from "./AdminTransactionChart";
 
 // Helper: derive per-branch tiket table name from cawangan id
 // e.g. "0105041A" -> negeri code "05" -> "tiket_05"
@@ -14,56 +15,53 @@ function getTiketTable(cawangan: string): string {
 // ==================== ADMIN HQ (level_akses = 1) ====================
 async function getAdminStats() {
   // Use latest available date from tiket_stat (stats may not be generated for today yet)
-  const latestResult = await prisma.$queryRawUnsafe<Array<{ latest: Date | null }>>(
-    `SELECT MAX(tarikh) as latest FROM tiket_stat`
-  );
+  const latestResult = await prisma.$queryRaw<Array<{ latest: Date | null }>>`
+    SELECT MAX(tarikh) as latest FROM tiket_stat
+  `;
   const latestDate = latestResult[0]?.latest;
   const todayStr = latestDate
     ? new Date(latestDate).toISOString().slice(0, 10)
     : new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  // Get branch count per state
-  const cawanganPerNegeri = await prisma.$queryRawUnsafe<
-    Array<{ negeri: string; jumlah: bigint }>
-  >(
-    `SELECT SUBSTRING(id_cawangan, 3, 2) as negeri, COUNT(*) as jumlah
-     FROM cawangan GROUP BY SUBSTRING(id_cawangan, 3, 2)`
-  );
-
-  // Get branches on holiday today (hari cuti)
-  const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-  const dayCode = days[new Date(Date.now() + 8 * 60 * 60 * 1000).getDay()];
-  const cutiHariIni = await prisma.$queryRawUnsafe<
-    Array<{ negeri: string; jumlah: bigint }>
-  >(
-    `SELECT SUBSTRING(cawangan, 3, 2) as negeri, COUNT(*) as jumlah
-     FROM hari_cuti WHERE nama_hari = ?
-     GROUP BY SUBSTRING(cawangan, 3, 2)`,
-    dayCode
-  );
-
   // Get today's transaction count per state from tiket_stat
-  const transaksiPerNegeri = await prisma.$queryRawUnsafe<
+  const transaksiPerNegeri = await prisma.$queryRaw<
     Array<{ negeri: string; jumlah: bigint }>
-  >(
-    `SELECT SUBSTRING(cawangan, 3, 2) as negeri, SUM(bil_tiket) as jumlah
-     FROM tiket_stat WHERE tarikh = ?
-     GROUP BY SUBSTRING(cawangan, 3, 2)`,
-    todayStr
-  );
+  >`
+    SELECT SUBSTRING(cawangan, 3, 2) as negeri, SUM(bil_tiket) as jumlah
+    FROM tiket_stat WHERE tarikh = ${todayStr}
+    GROUP BY SUBSTRING(cawangan, 3, 2)
+  `;
+
+  const transaksiPerCawangan = await prisma.$queryRaw<
+    Array<{
+      negeri: string;
+      id_cawangan: string;
+      nama_cawangan: string | null;
+      jumlah: bigint;
+    }>
+  >`
+    SELECT
+      SUBSTRING(ts.cawangan, 3, 2) as negeri,
+      ts.cawangan as id_cawangan,
+      c.nama_cawangan,
+      SUM(ts.bil_tiket) as jumlah
+    FROM tiket_stat ts
+    LEFT JOIN cawangan c ON c.id_cawangan = ts.cawangan
+    WHERE ts.tarikh = ${todayStr}
+    GROUP BY SUBSTRING(ts.cawangan, 3, 2), ts.cawangan, c.nama_cawangan
+    ORDER BY SUBSTRING(ts.cawangan, 3, 2), jumlah DESC
+  `;
 
   return {
     tarikh: todayStr,
-    cawanganPerNegeri: cawanganPerNegeri.map((r) => ({
-      negeri: r.negeri,
-      jumlah: Number(r.jumlah),
-    })),
-    cutiHariIni: cutiHariIni.map((r) => ({
-      negeri: r.negeri,
-      jumlah: Number(r.jumlah),
-    })),
     transaksiPerNegeri: transaksiPerNegeri.map((r) => ({
       negeri: r.negeri,
+      jumlah: Number(r.jumlah),
+    })),
+    transaksiPerCawangan: transaksiPerCawangan.map((r) => ({
+      negeri: r.negeri,
+      idCawangan: r.id_cawangan,
+      namaCawangan: r.nama_cawangan || r.id_cawangan,
       jumlah: Number(r.jumlah),
     })),
   };
@@ -436,15 +434,15 @@ export default async function DashboardPage() {
       { code: "16", name: "WP Putrajaya" },
     ];
 
-    const getCawangan = (code: string) =>
-      stats.cawanganPerNegeri.find((c) => c.negeri === code)?.jumlah || 0;
-    const getCuti = (code: string) =>
-      stats.cutiHariIni.find((c) => c.negeri === code)?.jumlah || 0;
     const getTransaksi = (code: string) =>
       stats.transaksiPerNegeri.find((c) => c.negeri === code)?.jumlah || 0;
 
-    const totalCawangan = NEGERI_LIST.reduce((s, n) => s + getCawangan(n.code), 0);
     const totalTransaksi = NEGERI_LIST.reduce((s, n) => s + getTransaksi(n.code), 0);
+    const transaksiChartData = NEGERI_LIST.map((n) => ({
+      code: n.code,
+      negeri: n.name,
+      transaksi: getTransaksi(n.code),
+    }));
 
     return (
       <div>
@@ -453,90 +451,18 @@ export default async function DashboardPage() {
           <p className="text-gray-500 mt-1">Ringkasan keseluruhan sistem JPJeQ</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Operasi Negeri */}
-          <div className="bg-white rounded-xl border border-orange-300 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200">
-              <h3 className="font-bold text-gray-800">Operasi Negeri</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Bil.</th>
-                    <th className="px-3 py-2 text-left">Negeri</th>
-                    <th className="px-3 py-2 text-center">Cawangan Berdaftar</th>
-                    <th className="px-3 py-2 text-center">Sedang Beroperasi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {NEGERI_LIST.map((n, idx) => {
-                    const caw = getCawangan(n.code);
-                    const cuti = getCuti(n.code);
-                    return (
-                      <tr key={n.code} className="hover:bg-gray-50">
-                        <td className="px-3 py-2">{idx + 1}</td>
-                        <td className="px-3 py-2">{n.name}</td>
-                        <td className="px-3 py-2 text-center">{caw}</td>
-                        <td className="px-3 py-2 text-center">{Math.max(0, caw - cuti)}</td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="bg-gray-100 font-semibold">
-                    <td className="px-3 py-2" colSpan={2}>Jumlah</td>
-                    <td className="px-3 py-2 text-center">{totalCawangan}</td>
-                    <td className="px-3 py-2 text-center">
-                      {totalCawangan - NEGERI_LIST.reduce((s, n) => s + getCuti(n.code), 0)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Jumlah Transaksi Mengikut Negeri */}
           <div className="bg-white rounded-xl border border-orange-300 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200">
               <h3 className="font-bold text-gray-800">Jumlah Transaksi</h3>
               <p className="text-xs text-gray-400">Tarikh: {stats.tarikh} — Jumlah keseluruhan: {totalTransaksi}</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Bil.</th>
-                    <th className="px-3 py-2 text-left">Negeri</th>
-                    <th className="px-3 py-2 text-center">Transaksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {NEGERI_LIST.map((n, idx) => {
-                    const trans = getTransaksi(n.code);
-                    return (
-                      <tr key={n.code} className="hover:bg-gray-50">
-                        <td className="px-3 py-2">{idx + 1}</td>
-                        <td className="px-3 py-2">{n.name}</td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="flex items-center gap-2 justify-center">
-                            <div className="flex-1 max-w-[120px] bg-gray-200 rounded-full h-4">
-                              <div
-                                className="bg-blue-500 h-4 rounded-full"
-                                style={{ width: `${totalTransaksi > 0 ? (trans / totalTransaksi) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="font-medium w-10 text-right">{trans}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="bg-gray-100 font-semibold">
-                    <td className="px-3 py-2" colSpan={2}>Jumlah</td>
-                    <td className="px-3 py-2 text-center">{totalTransaksi}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <AdminTransactionChart
+              branches={stats.transaksiPerCawangan}
+              data={transaksiChartData}
+              totalTransaksi={totalTransaksi}
+            />
           </div>
         </div>
       </div>
@@ -781,8 +707,8 @@ export default async function DashboardPage() {
       where: { idCawangan: session.user.idCawangan },
     });
 
-    const qrImage = cawangan?.gambar_qr
-      ? `data:image/png;base64,${cawangan.gambar_qr}`
+    const qrImage = cawangan?.gambarQr
+      ? `data:image/png;base64,${cawangan.gambarQr}`
       : null;
 
     return (

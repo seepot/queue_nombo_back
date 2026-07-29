@@ -2,16 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Helper: extract HH:MM:SS from ISO time string or return as-is
+// Helper: extract HH:MM:SS from ISO time string or Date object
 function formatTime(val: unknown): string | null {
   if (!val) return null;
+  if (val instanceof Date) {
+    const h = String(val.getUTCHours()).padStart(2, "0");
+    const m = String(val.getUTCMinutes()).padStart(2, "0");
+    const s = String(val.getUTCSeconds()).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  }
   const str = String(val);
-  // Prisma returns TIME as "1970-01-01T00:45:05.000Z"
   const match = str.match(/T(\d{2}:\d{2}:\d{2})/);
   if (match) return match[1];
-  // Already in HH:MM:SS format
   if (/^\d{2}:\d{2}:\d{2}$/.test(str)) return str;
-  return str;
+  const dateMatch = str.match(/(\d{2}):(\d{2}):(\d{2})/);
+  if (dateMatch) return `${dateMatch[1]}:${dateMatch[2]}:${dateMatch[3]}`;
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -21,13 +27,18 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const cawangan = session.user.idCawangan;
+  const cawangan = searchParams.get("cawangan") || session.user.idCawangan;
   const dari = searchParams.get("dari");
   const hingga = searchParams.get("hingga");
   const jenis = searchParams.get("jenis") || "1";
 
   if (!dari || !hingga) {
     return NextResponse.json({ error: "Tarikh diperlukan" }, { status: 400 });
+  }
+
+  // Always filter by cawangan to avoid full table scan (14M+ rows)
+  if (!cawangan || cawangan === "000000") {
+    return NextResponse.json({ error: "Sila pilih cawangan" }, { status: 400 });
   }
 
   if (jenis === "1") {

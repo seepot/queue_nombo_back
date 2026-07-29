@@ -2,6 +2,21 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+// Format number with thousand separator
+function fmt(n: number): string {
+  return n.toLocaleString("en-MY");
+}
 
 interface ReportRow {
   tarikh?: string;
@@ -134,6 +149,25 @@ export default function LaporanTransaksiPage() {
         </form>
       </div>
 
+      {/* Chart */}
+      {data.length > 0 && activeJenis !== "4" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Graf Transaksi</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data.map((row) => ({ label: getRowLabel(row), Tiket: row.bil_tiket, Selesai: row.bil_selesai, Batal: row.bil_batal }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="Tiket" fill="#3b82f6" />
+              <Bar dataKey="Selesai" fill="#22c55e" />
+              <Bar dataKey="Batal" fill="#ef4444" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Results Table */}
       {data.length > 0 && activeJenis !== "4" && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -160,12 +194,12 @@ export default function LaporanTransaksiPage() {
                 {data.map((row, idx) => (
                   <tr key={idx} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{getRowLabel(row)}</td>
-                    <td className="px-4 py-3">{row.bil_tiket}</td>
-                    <td className="px-4 py-3">{row.bil_selesai}</td>
-                    <td className="px-4 py-3">{row.bil_batal}</td>
-                    <td className="px-4 py-3">{row.batal_cust}</td>
-                    <td className="px-4 py-3">{row.batal_kaunter}</td>
-                    <td className="px-4 py-3">{row.bil_lain}</td>
+                    <td className="px-4 py-3">{fmt(row.bil_tiket)}</td>
+                    <td className="px-4 py-3">{fmt(row.bil_selesai)}</td>
+                    <td className="px-4 py-3">{fmt(row.bil_batal)}</td>
+                    <td className="px-4 py-3">{fmt(row.batal_cust)}</td>
+                    <td className="px-4 py-3">{fmt(row.batal_kaunter)}</td>
+                    <td className="px-4 py-3">{fmt(row.bil_lain)}</td>
                     <td className="px-4 py-3">{row.purata_masa_menunggu || "-"}</td>
                     <td className="px-4 py-3">{row.purata_masa_layanan || "-"}</td>
                   </tr>
@@ -173,12 +207,12 @@ export default function LaporanTransaksiPage() {
                 {/* Totals */}
                 <tr className="bg-gray-100 font-semibold">
                   <td className="px-4 py-3">Jumlah</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.bil_tiket || 0), 0)}</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.bil_selesai || 0), 0)}</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.bil_batal || 0), 0)}</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.batal_cust || 0), 0)}</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.batal_kaunter || 0), 0)}</td>
-                  <td className="px-4 py-3">{data.reduce((s, r) => s + (r.bil_lain || 0), 0)}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.bil_tiket || 0), 0))}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.bil_selesai || 0), 0))}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.bil_batal || 0), 0))}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.batal_cust || 0), 0))}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.batal_kaunter || 0), 0))}</td>
+                  <td className="px-4 py-3">{fmt(data.reduce((s, r) => s + (r.bil_lain || 0), 0))}</td>
                   <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
                 </tr>
@@ -212,14 +246,14 @@ export default function LaporanTransaksiPage() {
                     <td className="px-4 py-3 text-center">{idx + 1}</td>
                     <td className="px-4 py-3 text-center">{row.tarikh || "-"}</td>
                     <td className="px-4 py-3 text-center">{row.masa || "-"}</td>
-                    <td className="px-4 py-3 text-center">{row.bil_tiket}</td>
-                    <td className="px-4 py-3 text-center">{row.batal_cust || 0}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.bil_tiket)}</td>
+                    <td className="px-4 py-3 text-center">{fmt(row.batal_cust || 0)}</td>
                   </tr>
                 ))}
                 <tr className="bg-gray-100 font-semibold">
                   <td className="px-4 py-3 text-right" colSpan={3}>Jumlah</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + r.bil_tiket, 0)}</td>
-                  <td className="px-4 py-3 text-center">{data.reduce((s, r) => s + (r.batal_cust || 0), 0)}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + r.bil_tiket, 0))}</td>
+                  <td className="px-4 py-3 text-center">{fmt(data.reduce((s, r) => s + (r.batal_cust || 0), 0))}</td>
                 </tr>
               </tbody>
             </table>

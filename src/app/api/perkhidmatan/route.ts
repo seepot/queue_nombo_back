@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       noSiri: Number(body.noSiri) || 0,
       noTerkini: Number(body.noSiri) || 0,
       kategori: 2,
-      isPelbagai: body.isPelbagai ? Number(body.isPelbagai) : 0,
+      ispelbagai: body.isPelbagai ? Number(body.isPelbagai) : 0,
       createDate: new Date(Date.now() + 8 * 60 * 60 * 1000),
     },
   });

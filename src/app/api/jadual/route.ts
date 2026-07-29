@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
     data: {
       nokp: kakitangan,
       idKaunter: Number(kaunter),
-      id_cawangan: session.user.idCawangan,
-      tarikh_mula: new Date(tarikhmula),
-      tarikh_tamat: new Date(tarikhakhir),
-      status_aktif: 1,
-      create_date: now,
+      idCawangan: session.user.idCawangan,
+      tarikhMula: new Date(tarikhmula),
+      tarikhTamat: new Date(tarikhakhir),
+      statusAktif: 1,
+      createDate: now,
     },
   });
 

@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
         where: { idCawangan },
         data: {
           kodQR: enc,
-          gambar_qr: base64,
-          tarikh_jana: now,
+          gambarQr: base64,
+          tarikhJana: now,
         },
       });
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       where: { idCawangan },
       data: {
         kodQR: enc,
-        tarikh_jana: now,
+        tarikhJana: now,
       },
     });
     return NextResponse.json({ success: true });

@@ -12,6 +12,10 @@ interface Props {
   perkhidmatan: Perkhidmatan[];
 }
 
+const PAGE_SIZE = 20;
+type SortKey = "id" | "keterangan";
+type SortDirection = "asc" | "desc";
+
 export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
   const router = useRouter();
   const [showAdd, setShowAdd] = useState(false);
@@ -24,6 +28,9 @@ export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
   const [viewKumpulan, setViewKumpulan] = useState<Array<{ keterangan: string; id_cawangan: string; nama_cawangan: string }>>([]);
   const [loadingView, setLoadingView] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<SortKey>("id");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const handleView = async (p: Perkhidmatan) => {
     setViewItem(p);
@@ -44,6 +51,31 @@ export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
   const filtered = perkhidmatan.filter((p) =>
     search ? (p.keterangan || "").toLowerCase().includes(search.toLowerCase()) : true
   );
+  const sorted = [...filtered].sort((a, b) => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    if (sortKey === "id") return (a.id - b.id) * direction;
+    return (a.keterangan || "").localeCompare(b.keterangan || "", "ms") * direction;
+  });
+  const totalPages = Math.max(Math.ceil(sorted.length / PAGE_SIZE), 1);
+  const safePage = Math.min(page, totalPages);
+  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const startRecord = sorted.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const endRecord = Math.min(safePage * PAGE_SIZE, sorted.length);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((value) => (value === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+    setPage(1);
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,7 +266,10 @@ export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Cari perkhidmatan..."
             className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm"
           />
@@ -243,13 +278,29 @@ export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">ID</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Perkhidmatan</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <button
+                    className="inline-flex items-center gap-1 hover:text-blue-700"
+                    onClick={() => handleSort("id")}
+                    type="button"
+                  >
+                    ID <span className="text-xs">{sortIcon("id")}</span>
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <button
+                    className="inline-flex items-center gap-1 hover:text-blue-700"
+                    onClick={() => handleSort("keterangan")}
+                    type="button"
+                  >
+                    Perkhidmatan <span className="text-xs">{sortIcon("keterangan")}</span>
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((p) => (
+              {paged.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-500">{p.id}</td>
                   <td className="px-4 py-3 font-medium">{p.keterangan}</td>
@@ -285,6 +336,32 @@ export default function PerkhidmatanAdminPage({ perkhidmatan }: Props) {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-gray-500">
+            Papar {startRecord}-{endRecord} daripada {sorted.length} rekod
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-lg border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={safePage <= 1}
+              onClick={() => setPage((value) => Math.max(value - 1, 1))}
+              type="button"
+            >
+              Sebelum
+            </button>
+            <span className="px-2 text-gray-600">
+              Halaman {safePage} / {totalPages}
+            </span>
+            <button
+              className="rounded-lg border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((value) => Math.min(value + 1, totalPages))}
+              type="button"
+            >
+              Seterusnya
+            </button>
+          </div>
         </div>
       </div>
     </div>

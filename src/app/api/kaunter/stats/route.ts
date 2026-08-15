@@ -44,9 +44,21 @@ export async function GET() {
 
   // Current ticket
   const currentTicket = await prisma.$queryRawUnsafe<
-    Array<{ no_tiket: number; transid: string; status_tiket: number }>
+    Array<{
+      no_tiket: number;
+      transid: string;
+      status_tiket: number;
+      call_date: Date | null;
+      idle_minutes: number | null;
+    }>
   >(
-    `SELECT no_tiket, transid, status_tiket FROM ${tbl}
+    `SELECT
+       no_tiket,
+       transid,
+       status_tiket,
+       call_date,
+       TIMESTAMPDIFF(MINUTE, call_date, NOW()) as idle_minutes
+     FROM ${tbl}
      WHERE cawangan = ? AND kaunter = ? AND DATE(tarikh) = ?
      AND status_tiket IN (1, 2)
      ORDER BY call_date DESC LIMIT 1`,
@@ -133,14 +145,20 @@ export async function GET() {
   >(
     `SELECT COUNT(*) as bilangan, b.keterangan FROM ${tbl} a
      INNER JOIN kumpulan_perkhidmatan b ON a.kumpulan_perkhidmatan = b.id
-     WHERE a.cawangan = ? AND DATE(a.tarikh) = ?
+     WHERE a.cawangan = ? AND a.kaunter = ? AND DATE(a.tarikh) = ?
      GROUP BY a.kumpulan_perkhidmatan`,
     idCawangan,
+    kaunterNum,
     todayStr
   );
 
   return NextResponse.json({
-    currentTicket: currentTicket[0] || null,
+    currentTicket: currentTicket[0]
+      ? {
+          ...currentTicket[0],
+          idle_minutes: Number(currentTicket[0].idle_minutes || 0),
+        }
+      : null,
     waitingList,
     cancelledList,
     transferredList,

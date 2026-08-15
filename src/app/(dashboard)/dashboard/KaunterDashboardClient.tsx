@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 
 // Helper: extract HH:MM from ISO date string without timezone conversion
 // DB stores local time (MYT), so we read the time portion directly
+const IDLE_REMINDER_MS = 5 * 60 * 1000;
+const IDLE_SNOOZE_MS = 60 * 1000;
+const IDLE_REMINDER_MINUTES = IDLE_REMINDER_MS / 60000;
+
 function formatTimeFromDB(dateStr: string | null): string {
   if (!dateStr) return "-";
   // dateStr is ISO like "2026-07-17T20:30:22.000Z" where 20:30 is already local time
@@ -49,7 +53,13 @@ interface BilanganPerkhidmatan {
 }
 
 interface StaffStats {
-  currentTicket: { no_tiket: number; transid: string; status_tiket: number } | null;
+  currentTicket: {
+    no_tiket: number;
+    transid: string;
+    status_tiket: number;
+    call_date: string | null;
+    idle_minutes: number | null;
+  } | null;
   waitingList: WaitingTicket[];
   cancelledList: CancelledTicket[];
   transferredList: TransferredTicket[];
@@ -89,9 +99,21 @@ export default function KaunterDashboardClient({
   const [aktifNo, setAktifNo] = useState("");
   const [showPindahModal, setShowPindahModal] = useState(false);
   const [pindahKaunter, setPindahKaunter] = useState("");
+  const [showIdleReminder, setShowIdleReminder] = useState(false);
+  const [idleStartedAt, setIdleStartedAt] = useState<number | null>(
+    initialStats.currentTicket?.call_date
+      ? new Date(initialStats.currentTicket.call_date).getTime()
+      : initialStats.currentTicket
+        ? Date.now()
+        : null
+  );
+  const [dbIdleMinutes, setDbIdleMinutes] = useState(
+    initialStats.currentTicket?.idle_minutes ?? 0
+  );
 
   // Auto-refresh: poll for new data every 5 seconds
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -104,6 +126,11 @@ export default function KaunterDashboardClient({
           if (data.currentTicket) {
             setCurrentNo(data.currentTicket.no_tiket);
             setCurrentTransid(data.currentTicket.transid);
+            setDbIdleMinutes(data.currentTicket.idle_minutes ?? 0);
+          } else {
+            setCurrentNo(null);
+            setCurrentTransid(null);
+            setDbIdleMinutes(0);
           }
         }
       } catch {
@@ -116,6 +143,38 @@ export default function KaunterDashboardClient({
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+
+    if (!currentNo) {
+      setShowIdleReminder(false);
+      setIdleStartedAt(null);
+      return;
+    }
+
+    setShowIdleReminder(false);
+    const currentCallDate = stats.currentTicket?.call_date;
+    const currentIdleMinutes = stats.currentTicket?.idle_minutes ?? dbIdleMinutes;
+    setIdleStartedAt(currentCallDate ? new Date(currentCallDate).getTime() : Date.now());
+
+    if (currentIdleMinutes >= IDLE_REMINDER_MINUTES) {
+      setShowIdleReminder(true);
+      return;
+    }
+
+    const remainingMs = Math.max(
+      IDLE_REMINDER_MS - currentIdleMinutes * 60 * 1000,
+      0
+    );
+    idleTimer.current = setTimeout(() => {
+      setShowIdleReminder(true);
+    }, remainingMs);
+
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, [currentNo, dbIdleMinutes, stats.currentTicket]);
 
   const doAction = useCallback(
     async (action: string, extraBody: Record<string, unknown> = {}) => {
@@ -214,6 +273,7 @@ export default function KaunterDashboardClient({
     if (data?.success) {
       setCurrentNo(null);
       setCurrentTransid(null);
+      setShowIdleReminder(false);
       refreshPage();
     }
   };
@@ -228,9 +288,22 @@ export default function KaunterDashboardClient({
     if (data?.success) {
       setCurrentNo(null);
       setCurrentTransid(null);
+      setShowIdleReminder(false);
       refreshPage();
     }
   };
+
+  const handleIdleSnooze = () => {
+    setShowIdleReminder(false);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      if (currentNo) setShowIdleReminder(true);
+    }, IDLE_SNOOZE_MS);
+  };
+
+  const idleMinutes = idleStartedAt
+    ? Math.max(1, Math.floor((Date.now() - idleStartedAt) / 60000))
+    : 0;
 
   return (
     <div>
@@ -244,6 +317,46 @@ export default function KaunterDashboardClient({
           >
             &times;
           </button>
+        </div>
+      )}
+
+      {showIdleReminder && currentNo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-800">
+              Tiket Masih Sedang Dipanggil
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              No tiket <span className="font-bold text-gray-900">{currentNo}</span>{" "}
+              sudah idle lebih kurang {idleMinutes} minit. Sila tekan
+              <span className="font-semibold text-green-700"> Selesai</span> jika
+              urusan sudah tamat atau
+              <span className="font-semibold text-red-700"> Batal</span> jika
+              pelanggan tidak diteruskan.
+            </p>
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <button
+                onClick={handleSelesai}
+                disabled={loading === "selesai"}
+                className="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-600 disabled:bg-green-300"
+              >
+                {loading === "selesai" ? "..." : "Selesai"}
+              </button>
+              <button
+                onClick={handleBatal}
+                disabled={loading === "batal"}
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:bg-red-300"
+              >
+                {loading === "batal" ? "..." : "Batal"}
+              </button>
+              <button
+                onClick={handleIdleSnooze}
+                className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-300"
+              >
+                Ingatkan Semula
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

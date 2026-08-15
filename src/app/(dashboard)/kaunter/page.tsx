@@ -13,13 +13,22 @@ async function getKaunterData(idCawangan: string) {
     .slice(0, 10);
   const tbl = getTiketTable(idCawangan);
 
-  const [kaunters, kumpulan] = await Promise.all([
+  const [kaunters, kumpulan, zon] = await Promise.all([
     prisma.kaunter.findMany({
       where: { idCawangan },
       orderBy: { id: "asc" },
     }),
     prisma.kumpulanPerkhidmatan.findMany({
       where: { idCawangan },
+    }),
+    prisma.zon.findMany({
+      where: { cawangan: idCawangan },
+      orderBy: { id: "asc" },
+      select: {
+        id: true,
+        zon: true,
+        catatan: true,
+      },
     }),
   ]);
 
@@ -83,7 +92,7 @@ async function getKaunterData(idCawangan: string) {
     })
   );
 
-  return { kaunters: kaunterStats, kumpulan };
+  return { kaunters: kaunterStats, kumpulan, zon };
 }
 
 export default async function KaunterPage() {
@@ -113,6 +122,7 @@ export default async function KaunterPage() {
       <KaunterClient
         kaunters={JSON.parse(JSON.stringify(data.kaunters))}
         kumpulan={JSON.parse(JSON.stringify(data.kumpulan))}
+        zon={JSON.parse(JSON.stringify(data.zon))}
         namaCawangan={cawangan?.namaCawangan || session.user.namaCawangan}
       />
     </div>

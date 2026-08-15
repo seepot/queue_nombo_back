@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import TemujanjiClient from "./TemujanjiClient";
 
 async function getTemujanjiData(idCawangan: string) {
@@ -25,6 +26,7 @@ async function getTemujanjiData(idCawangan: string) {
 export default async function TemujanjiPage() {
   const session = await auth();
   if (!session) return null;
+  if (session.user.levelAkses === "1") redirect("/temujanji/kalendar");
 
   const data = await getTemujanjiData(session.user.idCawangan);
 

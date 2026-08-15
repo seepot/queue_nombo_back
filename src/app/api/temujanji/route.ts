@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+const SLOT_INTERVAL_MINUTES = 30;
+
 // GET: List appointments for a branch
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -134,7 +136,7 @@ export async function POST(req: NextRequest) {
         let currentTime = parseTime(startTime);
         const endMinutes = parseTime(endTime);
 
-        while (currentTime <= endMinutes) {
+        while (currentTime + SLOT_INTERVAL_MINUTES <= endMinutes) {
           const timeStr = formatTime(currentTime);
 
           // Create tempahan_masa
@@ -160,7 +162,7 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          currentTime += 30; // 30 minutes
+          currentTime += SLOT_INTERVAL_MINUTES;
           created++;
         }
       }

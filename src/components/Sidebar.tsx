@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { useState } from "react";
 
 interface SubItem {
@@ -57,7 +56,18 @@ const navItems: NavItem[] = [
     icon: "calendar",
     roles: ["2"],
   },
-  { label: "Temujanji", href: "/temujanji", icon: "calendar", roles: ["1", "2"] },
+  {
+    label: "Temujanji",
+    href: "/temujanji",
+    icon: "calendar",
+    roles: ["1", "2"],
+    subItems: [
+      { label: "Senarai", href: "/temujanji", roles: ["2"] },
+      { label: "Buka Temujanji", href: "/temujanji/buka", roles: ["2"] },
+      { label: "Draf Slot Temujanji", href: "/temujanji/draf-slot", roles: ["2"] },
+      { label: "Kalendar Temujanji", href: "/temujanji/kalendar" },
+    ],
+  },
   {
     label: "Laporan",
     href: "/laporan",
@@ -77,6 +87,9 @@ const navItems: NavItem[] = [
     roles: ["2"],
     subItems: [
       { label: "Kemaskini Info", href: "/pentadbiran" },
+      { label: "Had Limit", href: "/pentadbiran/had-limit" },
+      { label: "Koordinat/Radius", href: "/pentadbiran/koordinat-radius" },
+      { label: "Zon", href: "/pentadbiran/zon" },
       { label: "Masa Operasi", href: "/pentadbiran/waktu-operasi" },
     ],
   },
@@ -266,18 +279,7 @@ export default function Sidebar({ userLevel }: { userLevel: string }) {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 w-full transition"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          {!collapsed && <span>Log Keluar</span>}
-        </button>
-      </div>
+      <div className="border-t border-gray-200 p-3" />
     </aside>
   );
 }

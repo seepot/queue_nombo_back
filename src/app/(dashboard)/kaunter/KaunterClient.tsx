@@ -9,6 +9,7 @@ interface Kaunter {
   namaKaunter: string | null;
   idPerkhidmatanKumpulan: number | null;
   susunanKeutamaan: string | null;
+  zon: string | null;
   jumlahTransaksi?: number;
   noTerakhir?: number | null;
   tarikh?: string | null;
@@ -20,13 +21,20 @@ interface Kumpulan {
   keterangan: string | null;
 }
 
+interface Zon {
+  id: number;
+  zon: string;
+  catatan: string;
+}
+
 interface Props {
   kaunters: Kaunter[];
   kumpulan: Kumpulan[];
+  zon: Zon[];
   namaCawangan: string;
 }
 
-export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Props) {
+export default function KaunterClient({ kaunters, kumpulan, zon, namaCawangan }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [viewItem, setViewItem] = useState<Kaunter | null>(null);
@@ -39,6 +47,7 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
     utama3: "",
     utama4: "",
     utama5: "",
+    zon: "",
   });
 
   const getKumpulanName = (id: number | null) => {
@@ -57,6 +66,13 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
       .join("\n");
   };
 
+  const getZonName = (zonId: string | null) => {
+    if (!zonId) return "-";
+    const item = zon.find((z) => String(z.id) === String(zonId));
+    if (!item) return zonId;
+    return item.catatan ? `${item.zon} - ${item.catatan}` : item.zon;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const susunan = [formData.utama1, formData.utama2, formData.utama3, formData.utama4, formData.utama5]
@@ -70,13 +86,14 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
         noKaunter: formData.noKaunter,
         idPerkhidmatanKumpulan: Number(formData.kumpulan) || null,
         susunanKeutamaan: susunan || null,
+        zon: formData.zon || null,
       }),
     });
 
     if (res.ok) {
       setMsg({ type: "success", text: "Pendaftaran Kaunter Berjaya" });
       setShowForm(false);
-      setFormData({ noKaunter: "", kumpulan: "", utama1: "", utama2: "", utama3: "", utama4: "", utama5: "" });
+      setFormData({ noKaunter: "", kumpulan: "", utama1: "", utama2: "", utama3: "", utama4: "", utama5: "", zon: "" });
       router.refresh();
     } else {
       setMsg({ type: "error", text: "Pendaftaran gagal" });
@@ -117,6 +134,7 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Cawangan</th>
                 <th className="px-4 py-3 text-left font-medium">Kaunter</th>
+                <th className="px-4 py-3 text-left font-medium">Zon/Aras</th>
                 <th className="px-4 py-3 text-left font-medium">Perkhidmatan</th>
                 <th className="px-4 py-3 text-left font-medium">Jumlah Transaksi</th>
                 <th className="px-4 py-3 text-left font-medium">No. Terakhir</th>
@@ -128,7 +146,7 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
             <tbody className="divide-y divide-gray-100">
               {kaunters.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                     Tiada kaunter didaftarkan
                   </td>
                 </tr>
@@ -137,6 +155,7 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
                   <tr key={k.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{namaCawangan}</td>
                     <td className="px-4 py-3">{k.noKaunter || "-"}</td>
+                    <td className="px-4 py-3">{getZonName(k.zon)}</td>
                     <td className="px-4 py-3">{getKumpulanName(k.idPerkhidmatanKumpulan)}</td>
                     <td className="px-4 py-3">{k.jumlahTransaksi ?? 0}</td>
                     <td className="px-4 py-3">{k.noTerakhir ?? "-"}</td>
@@ -210,6 +229,24 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zon/Aras
+                </label>
+                <select
+                  value={formData.zon}
+                  onChange={(e) => setFormData({ ...formData, zon: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">Sila Pilih Zon/Aras</option>
+                  {zon.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.catatan ? `${z.zon} - ${z.catatan}` : z.zon}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -297,6 +334,15 @@ export default function KaunterClient({ kaunters, kumpulan, namaCawangan }: Prop
                 </label>
                 <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
                   Kaunter {viewItem.noKaunter}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">
+                  Zon/Aras
+                </label>
+                <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                  {getZonName(viewItem.zon)}
                 </div>
               </div>
 

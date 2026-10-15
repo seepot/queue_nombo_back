@@ -1,100 +1,151 @@
-# 🏛️ JPJeQ Next (Sistem Pengurusan Giliran Pintar JPJ)
+# QueNombo — Sistem Pengurusan Giliran SaaS
 
-Sistem Pengurusan Giliran Pintar Jabatan Pengangkutan Jalan Malaysia (JPJeQ) versi moden berasaskan **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, dan **MySQL**.
+QueNombo ialah platform pengurusan giliran pintar berbilang tenant (multi-tenant SaaS) untuk klinik, farmasi, agensi dan rangkaian cawangan. Setiap organisasi (tenant) mendaftar sendiri, mendapat percubaan percuma 14 hari, dan melanggan pelan STARTER, PRO atau ENTERPRISE mengikut bilangan cawangan, kaunter dan paparan TV yang diperlukan.
 
----
-
-## 🚀 Ciri-Ciri Utama Sistem
-
-### 1. 🏢 Papan Pemuka Operasi Mengikut Peranan (*Role-Based Dashboard*)
-- **Superadmin HQ (Level 1)**: Pemantauan kuota pukal seluruh negara, status WebSocket, jejak audit, analisis masa menunggu, dan penanda aras prestasi cawangan.
-- **Ketua Cawangan / KC (Level 2)**: Metrik operasi harian, pelarasan kuota cawangan, amaran awal kesesakan (*Congestion Alert Banner*), direktori kakitangan, dan konfigurasi kaunter.
-- **Staf Kaunter (Level 3)**: Panggilan tiket giliran masa nyata (*Next, Recall, Transfer, Cancel, Complete*), jam randik durasi layanan (*Live Stopwatch*), sejarah transaksi, dan penugasan kaunter automatik.
-- **Kiosk / Meja Khidmat Pelanggan (Level 4)**: Cetakan tiket fizikal mengikut kumpulan perkhidmatan dan pemantauan kuota sesi.
-- **Paparan Kod QR Awam (Level 5)**: Mod paparan Kod QR kehadiran awam beranimasi dengan status waktu operasi.
-- **Pengurusan Tertinggi (Level 6 & 7)**: Dashboard analisis eksekutif bagi Ketua Pengarah & Pengarah Negeri.
-
-### 2. 📺 Modul Pemantauan TV Dewan Menunggu (*TV Display Live Monitor*)
-- **Denyutan Nadi (*Heartbeat Ping*)**: Pengesanan automatik status TV di ruang menunggu (🟢 Online $<45$s, 🟡 Terganggu, 🔴 Terputus $>120$s).
-- **Kawalan Jauh (*Remote Command*)**: Arahan *Muat Semula (Force Reload)* dan *Uji Bunyi Loceng (Test Chime)* terus dari Dashboard Ketua Cawangan ke TV dewan menunggu.
-- **Lencana Amaran Terputus**: Sepanduk amaran merah di Dashboard KC jika TV didapati luar talian.
-
-### 3. 🗺️ Pelan Lantai Cawangan Interaktif (*Interactive Floorplan View*)
-- Visualisasi susun atur pod kaunter mengikut dewan/zon fizikal dengan lampu status beacon (Melayan/Sedia/Tutup) dan modal inspeksi cepat.
-
-### 4. 🔍 Carian Pintar Global (*Spotlight Command Palette*)
-- Pintasan papan kekunci `⌘K` / `Ctrl+K` untuk carian pantas cawangan, kakitangan, nombor tiket, dan menu navigasi.
-
-### 5. 🔔 Sistem Dialog & Notifikasi Moden
-- Modal pengesahan berasaskan Promise (`confirmModal`) dan notifikasi toast terapung beranimasi menggantikan `window.confirm` dan `window.alert` pelayar.
+Dibina dengan **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS 4**, **Prisma 6**, **PostgreSQL**, **Redis** dan **NextAuth v5**.
 
 ---
 
-## 🛠️ Keperluan & Pemasangan
+## Komponen Sistem
 
-### 1. Prasyarat
-- **Node.js**: v20.x atau ke atas
-- **MySQL Database**: Pelayan database `smartqdb` (Jadual `cawangan`, `users`, `kaunter`, `tiket_XX`, `tv_display`, dll.)
+| Komponen | Folder | Peranan |
+|---|---|---|
+| Aplikasi web (ini) | `jpjeq-next-mysql` | Dashboard, API, kiosk awam, bil & langganan |
+| Perkhidmatan masa nyata | `../jpjeq-realtime-service` | Gateway WebSocket (NestJS) untuk paparan TV, port 4001 |
+| Paparan TV | `../jpjeq-tv-display` | Aplikasi Ionic/Capacitor untuk skrin dewan menunggu |
 
-### 2. Pemboleh Ubah Persekitaran (`.env`)
-Salin atau konfigurasikan fail `.env`:
+---
 
-```env
-DATABASE_URL="mysql://username:password@localhost:3306/smartqdb"
-NEXTAUTH_SECRET="your-strong-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
+## Peranan Pengguna
 
-# Perkhidmatan Realtime WebSocket (Pilihan)
-REALTIME_SERVICE_URL="http://localhost:4001"
-REALTIME_SERVICE_SECRET="your-realtime-secret"
-```
+| Peranan | Akses |
+|---|---|
+| `SUPERADMIN` | Pemilik platform: pengurusan tenant, lanjut percubaan, kuota, bayaran manual, siaran, diagnostik, impersonasi |
+| `TENANT_ADMIN` | Pentadbir organisasi: cawangan, kakitangan, langganan & bil, integrasi WhatsApp, peranti |
+| `BRANCH_MANAGER` | Pengurus cawangan: arahan kaunter, tetapan premis, analisis |
+| `COUNTER_STAFF` | Staf kaunter: terminal panggilan giliran |
 
-### 3. Jalankan Projek
+---
+
+## Ciri Utama
+
+- **Giliran masa nyata**: nombor giliran atomik melalui Redis, panggilan kaunter (Next, Recall, Transfer, No-show, Complete), paparan TV dengan pairing PIN dan denyut nadi.
+- **Pelanggan awam**: imbas QR (`/scan/[slug]`), kiosk skrin sentuh (`/kiosk/[slug]`), tempahan temujanji (`/book/[slug]`), pantau tiket (`/ticket/[id]`), maklum balas CSAT.
+- **Langganan & kuota**: percubaan 14 hari, tempoh ihsan 7 hari selepas tamat, sekatan automatik pada API operasi dan kiosk apabila langganan tamat, kuota cawangan / kaunter / paparan dikuatkuasakan, pembatalan langganan, peringatan e-mel sebelum tamat.
+- **Bil**: FPX / kad melalui ToyyibPay, webhook yang disahkan semula melalui API gerbang, mod sandbox untuk pembangunan, invois & resit.
+- **Keselamatan**: had percubaan log masuk (anti brute force), had kadar pada API awam, lupa / tetap semula kata laluan melalui e-mel, jejak audit.
+- **Lain-lain**: notifikasi WhatsApp, pengumuman suara, ramalan AI beban kaunter, penyegerakan luar talian, PWA.
+
+---
+
+## Prasyarat
+
+- Node.js 20 atau lebih baharu
+- PostgreSQL 14 atau lebih baharu
+- Redis 6 atau lebih baharu
+
+---
+
+## Pemasangan
 
 ```bash
-# Pasang dependensi
 npm install
-
-# Jana klien Prisma
-npx prisma generate
-
-# Jalankan mod pembangunan
+cp .env.example .env        # kemudian isi nilai sebenar
+npx prisma migrate deploy   # cipta jadual (atau `npx prisma migrate dev` semasa pembangunan)
+node scripts/seed-superadmin.js
 npm run dev
-
-# Bina untuk produksi
-npm run build
-npm run start
 ```
 
-Layari `http://localhost:3000` di pelayar web.
+Layari `http://localhost:3000`. Akaun lalai yang dijana oleh skrip seed dicetak pada konsol.
 
 ---
 
-## 📂 Struktur Direktori Utama
+## Pemboleh Ubah Persekitaran
+
+Lihat `.env.example` untuk senarai penuh. Ringkasan:
+
+| Pemboleh ubah | Kegunaan |
+|---|---|
+| `DATABASE_URL` | Sambungan PostgreSQL |
+| `REDIS_URL` | Cache, urutan giliran, PIN pairing, had kadar, token tetapan semula |
+| `AUTH_SECRET`, `AUTH_URL` | NextAuth v5 |
+| `NEXT_PUBLIC_APP_URL` | URL awam aplikasi (digunakan dalam e-mel & URL kembali gerbang) |
+| `REALTIME_SERVICE_URL`, `REALTIME_SERVICE_SECRET` | Perkhidmatan WebSocket |
+| `CRON_SECRET` | Melindungi `GET /api/cron/subscriptions` |
+| `BILLING_WEBHOOK_SECRET` | Header `x-billing-secret` untuk webhook generik / simulasi |
+| `BILLING_SANDBOX_ENABLED` | Benarkan kaedah bayaran SANDBOX (lalai: hanya di luar produksi) |
+| `TOYYIBPAY_SECRET_KEY`, `TOYYIBPAY_CATEGORY_CODE`, `TOYYIBPAY_BASE_URL` | Gerbang ToyyibPay (`https://dev.toyyibpay.com` untuk sandbox) |
+| `RESEND_API_KEY`, `MAIL_FROM` | E-mel transaksi. Tanpa kunci, pautan dicatat ke konsol (dev sahaja) |
+
+---
+
+## Skrip
+
+```bash
+# Seed
+node scripts/seed-superadmin.js            # superadmin + tenant demo + pengguna contoh
+node scripts/seed-sample-clinic-tickets.js # tiket contoh
+
+# Ujian integrasi (perlukan `npm run dev` aktif; guna TEST_BASE_URL jika bukan port 3000)
+TEST_BASE_URL=http://localhost:3000 node scripts/test-subscription-enforcement.js
+TEST_BASE_URL=http://localhost:3000 node scripts/test-subscription-cancel.js
+TEST_BASE_URL=http://localhost:3000 node scripts/test-rate-limit.js
+TEST_BASE_URL=http://localhost:3000 node scripts/test-password-reset.js
+TEST_BASE_URL=http://localhost:3000 node scripts/test-billing-security.js
+```
+
+Skrip `test-*.js` lain menguji modul khusus (pendaftaran tenant, superadmin, peranti, WhatsApp, dsb.).
+
+---
+
+## Tugas Berjadual
+
+`GET /api/cron/subscriptions` menjalankan sapuan harian: menanda langganan tamat (`PAST_DUE` / `EXPIRED`) dan menghantar peringatan e-mel (percubaan hampir tamat, tempoh ihsan, tamat). Vercel Cron dikonfigurasi dalam `vercel.json`; pada PM2 / crontab, panggil endpoint ini dengan header `x-cron-secret`.
+
+---
+
+## Struktur Direktori
 
 ```
 src/
 ├── app/
-│   ├── (auth)/login/          # Halaman Log Masuk Moden
+│   ├── (auth)/                 # login, forgot-password, reset-password
 │   ├── (dashboard)/
-│   │   ├── dashboard/         # Dashboard mengikut peranan (HQ/KC/Staf)
-│   │   ├── kaunter/           # Pengurusan Kaunter & Pelan Lantai Interaktif
-│   │   ├── kakitangan/        # Pengurusan Kakitangan Cawangan
-│   │   ├── jadual/            # Jadual Tugasan Roster Mingguan
-│   │   ├── temujanji/         # Modul Slot & Kalendar Temujanji
-│   │   ├── laporan/           # Laporan SLA, Transaksi & Analisis Masa
-│   │   ├── pentadbiran/       # Tetapan Info, Kuota, Status TV & Jejak Audit
-│   │   └── aduan/             # Modul Aduan & Permohonan Change Request (CR)
-│   └── api/
-│       ├── auth/              # Handler NextAuth & Log Audit
-│       ├── kaunter/           # API Transaksi Panggilan & Status Kaunter
-│       ├── tv/                # API Heartbeat, Status & Kawalan Jauh TV
-│       └── ...
-├── components/                # Header, Sidebar, ToastProvider, Modal, Palette
-└── lib/                       # Prisma Client, NextAuth, Audit Logger, Helpers
+│   │   ├── dashboard/          # Papan pemuka mengikut peranan
+│   │   ├── superadmin/         # Pengurusan platform & tenant
+│   │   ├── cawangan/ pengurus/ # Cawangan, kaunter, kakitangan
+│   │   ├── terminal/           # Terminal panggilan kaunter
+│   │   ├── peranti/ qrcode/    # Pairing TV & kod QR premis
+│   │   ├── langganan/          # Pelan, bil, invois
+│   │   ├── onboarding/         # Persediaan awal premis
+│   │   ├── temujanji/ maklumbalas/ analisis/ ai-optima/ integrasi/
+│   ├── api/
+│   │   ├── auth/               # NextAuth, register, forgot/reset password
+│   │   ├── billing/            # checkout, webhook, verify, invoices, cancel
+│   │   ├── cron/               # sapuan langganan
+│   │   ├── tickets/ kaunter/ appointments/ devices/ tv/ branches/
+│   │   ├── superadmin/ reports/ whatsapp/ ai/ sync/ feedback/
+│   ├── book/ kiosk/ scan/ ticket/ pricing/ register/   # Laluan awam
+├── components/                 # Sidebar, Header, sepanduk langganan, modal, toast
+├── context/                    # Bahasa (BM / EN)
+└── lib/                        # prisma, redis, auth, subscription, quota, rate-limit,
+                                # payment-gateway, payments/toyyibpay, mailer, whatsapp, ...
+prisma/
+├── schema.prisma               # Tenant, Subscription, Branch, Counter, Device, Ticket, ...
+└── migrations/                 # Sejarah migrasi PostgreSQL
+scripts/                        # Seed & ujian integrasi
 ```
 
 ---
 
-## 📄 Hak Cipta & Lesen
-Hak Cipta Terpelihara © 2026 **Jabatan Pengangkutan Jalan (JPJ) Malaysia**.
+## Penggunaan Produksi
+
+- Bina dengan `npm run build` dan jalankan `npm run start`, atau gunakan `ecosystem.config.js` (PM2) di folder induk bersama perkhidmatan masa nyata.
+- Tetapkan `BILLING_SANDBOX_ENABLED=false`, rahsia rawak untuk `AUTH_SECRET`, `CRON_SECRET`, `BILLING_WEBHOOK_SECRET`, serta kelayakan ToyyibPay produksi dan `RESEND_API_KEY`.
+- Pastikan `NEXT_PUBLIC_APP_URL` ialah URL awam sebenar supaya URL kembali dan callback gerbang berfungsi.
+
+---
+
+## Lesen
+
+Hak Cipta Terpelihara © 2026 QueNombo. Semua hak terpelihara.

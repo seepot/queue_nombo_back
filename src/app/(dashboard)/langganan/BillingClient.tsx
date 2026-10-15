@@ -58,6 +58,11 @@ export default function BillingClient({
   const [paymentMethod, setPaymentMethod] = useState<"FPX" | "CARD" | "DUITNOW_QR" | "SANDBOX">("FPX");
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [loadingCancel, setLoadingCancel] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(subscription.status);
+  // Masa semasa diambil sekali semasa pemasangan supaya render kekal tulen
+  const [renderedAt] = useState(() => Date.now());
 
   // Invoices state
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
@@ -140,9 +145,57 @@ export default function BillingClient({
     }
   };
 
+  const handleCancelOrResume = async (action: "CANCEL" | "RESUME") => {
+    setLoadingCancel(true);
+    setFeedbackMessage(null);
+    try {
+      const res = await fetch("/api/billing/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubscriptionStatus(data.state?.status || (action === "CANCEL" ? "CANCELED" : "ACTIVE"));
+        setFeedbackMessage({ type: "success", text: data.message });
+        setConfirmCancel(false);
+        router.refresh();
+      } else {
+        setFeedbackMessage({
+          type: "error",
+          text: data.message || (language === "en" ? "Request failed." : "Permintaan gagal."),
+        });
+      }
+    } catch {
+      setFeedbackMessage({
+        type: "error",
+        text: language === "en" ? "Network connection error." : "Ralat sambungan rangkaian.",
+      });
+    } finally {
+      setLoadingCancel(false);
+    }
+  };
+
   const daysRemaining = subscription.endDate
-    ? Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - renderedAt) / (1000 * 60 * 60 * 24)))
     : null;
+
+  const canCancel = ["ACTIVE", "TRIAL", "PAST_DUE"].includes(subscriptionStatus);
+  const isCanceled = subscriptionStatus === "CANCELED";
+  const statusLabel = (() => {
+    switch (subscriptionStatus) {
+      case "TRIAL":
+        return language === "en" ? "Free Trial (14-Day)" : "Percubaan Percuma (14-Hari)";
+      case "CANCELED":
+        return language === "en" ? "Canceled (active until end date)" : "Dibatalkan (aktif hingga tarikh tamat)";
+      case "PAST_DUE":
+        return language === "en" ? "Past Due (grace period)" : "Tertunggak (tempoh ihsan)";
+      case "EXPIRED":
+        return language === "en" ? "Expired" : "Tamat Tempoh";
+      default:
+        return language === "en" ? "Active Subscription" : "Langganan Aktif";
+    }
+  })();
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 font-sans">
@@ -203,10 +256,14 @@ export default function BillingClient({
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-mono font-bold rounded-full uppercase tracking-wider">
-              {subscription.status === "TRIAL"
-                ? (language === "en" ? "Free Trial (14-Day)" : "Percubaan Percuma (14-Hari)")
-                : (language === "en" ? "Active Subscription" : "Langganan Aktif")}
+            <span
+              className={`px-3 py-1 text-xs font-mono font-bold rounded-full uppercase tracking-wider border ${
+                isCanceled || subscriptionStatus === "PAST_DUE" || subscriptionStatus === "EXPIRED"
+                  ? "bg-amber-500/20 border-amber-400/30 text-amber-300"
+                  : "bg-blue-500/20 border-blue-400/30 text-blue-300"
+              }`}
+            >
+              {statusLabel}
             </span>
             <span className="text-xs text-slate-400">
               {language === "en" ? "Cycle: " : "Kitaran: "}
@@ -223,6 +280,56 @@ export default function BillingClient({
                   : `Aktif sehingga ${new Date(subscription.endDate).toLocaleDateString("ms-MY")} (${daysRemaining} hari lagi)`)
               : (language === "en" ? "No expiration date" : "Tiada had tarikh")}
           </p>
+
+          {(canCancel || isCanceled) && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              {isCanceled ? (
+                <button
+                  type="button"
+                  disabled={loadingCancel}
+                  onClick={() => handleCancelOrResume("RESUME")}
+                  className="rounded-xl bg-emerald-500/20 border border-emerald-400/40 px-3 py-1.5 font-bold text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50 cursor-pointer"
+                >
+                  {loadingCancel
+                    ? "..."
+                    : language === "en"
+                    ? "Undo cancellation"
+                    : "Tarik balik pembatalan"}
+                </button>
+              ) : !confirmCancel ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmCancel(true)}
+                  className="rounded-xl border border-white/20 px-3 py-1.5 font-semibold text-slate-300 hover:bg-white/10 cursor-pointer"
+                >
+                  {language === "en" ? "Cancel subscription" : "Batalkan langganan"}
+                </button>
+              ) : (
+                <>
+                  <span className="text-slate-300">
+                    {language === "en"
+                      ? "Service stays active until the end date and will not renew. Confirm?"
+                      : "Perkhidmatan kekal aktif hingga tarikh tamat dan tidak diperbaharui. Sahkan?"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loadingCancel}
+                    onClick={() => handleCancelOrResume("CANCEL")}
+                    className="rounded-xl bg-rose-500/20 border border-rose-400/40 px-3 py-1.5 font-bold text-rose-200 hover:bg-rose-500/30 disabled:opacity-50 cursor-pointer"
+                  >
+                    {loadingCancel ? "..." : language === "en" ? "Yes, cancel" : "Ya, batalkan"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancel(false)}
+                    className="rounded-xl px-3 py-1.5 font-semibold text-slate-300 hover:bg-white/10 cursor-pointer"
+                  >
+                    {language === "en" ? "No" : "Tidak"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md">

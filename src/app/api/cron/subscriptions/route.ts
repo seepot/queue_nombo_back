@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sweepExpiredSubscriptions } from "@/lib/subscription";
+import { sendSubscriptionReminders } from "@/lib/subscription-reminders";
 
 /**
  * GET /api/cron/subscriptions
- * Sapuan harian status langganan (TRIAL/ACTIVE -> PAST_DUE/EXPIRED).
+ * Sapuan harian status langganan (TRIAL/ACTIVE -> PAST_DUE/EXPIRED) dan peringatan e-mel.
  * Dilindungi oleh CRON_SECRET: Vercel Cron menghantar "Authorization: Bearer <CRON_SECRET>",
  * PM2/crontab boleh menghantar header "x-cron-secret".
  */
@@ -28,7 +29,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await sweepExpiredSubscriptions();
-    return NextResponse.json({ success: true, ranAt: new Date().toISOString(), ...result });
+    const reminders = await sendSubscriptionReminders();
+    return NextResponse.json({ success: true, ranAt: new Date().toISOString(), ...result, reminders });
   } catch (error) {
     console.error("[Cron Subscriptions Error]:", error);
     return NextResponse.json({ success: false, message: "Ralat semasa sapuan langganan." }, { status: 500 });

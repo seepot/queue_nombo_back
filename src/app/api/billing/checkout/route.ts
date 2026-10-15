@@ -12,6 +12,7 @@ import {
 } from "@/lib/payment-gateway";
 import { createToyyibPayBill } from "@/lib/payments/toyyibpay";
 import { enforceIpRateLimit } from "@/lib/rate-limit";
+import { requireVerifiedEmailForBilling } from "@/lib/email-verification";
 
 /**
  * POST /api/billing/checkout
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Pentadbir organisasi mesti mengesahkan e-mel sebelum membuat pembayaran
+    const emailGate = await requireVerifiedEmailForBilling(user);
+    if (emailGate) return emailGate;
 
     const limited = await enforceIpRateLimit(req, "billing-checkout", 10, 60);
     if (limited) return limited;

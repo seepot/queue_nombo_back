@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import IdleSessionManager from "@/components/IdleSessionManager";
 import BroadcastBanner from "@/components/BroadcastBanner";
 import SubscriptionBanner from "@/components/SubscriptionBanner";
+import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 
 export default async function DashboardLayout({
   children,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
             <div className="mx-auto w-full max-w-[1600px]">
               <BroadcastBanner />
               <SubscriptionBanner tenantId={sessionUser?.tenantId} role={sessionUser?.role} />
+              <EmailVerificationBanner userId={sessionUser?.id} role={sessionUser?.role} />
               {children}
             </div>
           </main>

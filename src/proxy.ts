@@ -18,6 +18,7 @@ export default auth((req) => {
     "/register",
     "/forgot-password",
     "/reset-password",
+    "/verify-email",
     "/api/cron",
     "/api/health",
     "/images",

@@ -11,6 +11,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
   const isIdleLogout = searchParams.get("reason") === "idle";
+  const isJustRegistered = searchParams.get("registered") === "true";
   const orgParam = searchParams.get("org") || searchParams.get("tenant") || "";
 
   const { language } = useLanguage();
@@ -86,6 +87,22 @@ function LoginForm() {
             <span>
               {language === "en" ? "Logging into organization:" : "Log masuk ke organisasi:"}{" "}
               <strong className="font-mono uppercase">{orgParam}</strong>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isJustRegistered && !error && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs text-emerald-900 flex items-start gap-2.5 shadow-2xs animate-in fade-in slide-in-from-top-2 duration-200">
+          <span className="text-base shrink-0">✉️</span>
+          <div className="min-w-0">
+            <strong className="font-bold block">
+              {language === "en" ? "Registration Successful" : "Pendaftaran Berjaya"}
+            </strong>
+            <span className="text-emerald-800 leading-relaxed">
+              {language === "en"
+                ? "We sent a verification link to your email. You can sign in now; billing is unlocked once your email is verified."
+                : "Pautan pengesahan telah dihantar ke e-mel anda. Anda boleh log masuk sekarang; pengurusan bil dibuka selepas e-mel disahkan."}
             </span>
           </div>
         </div>

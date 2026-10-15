@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLanguage } from "@/context/LanguageContext";
 import Link from "next/link";
 import GeofenceMapPicker from "@/components/GeofenceMapPicker";
 
@@ -95,15 +94,17 @@ export default function BranchManagementClient({
   allStaff: UserItem[];
 }) {
   const router = useRouter();
-  const { language } = useLanguage();
   const [branches, setBranches] = useState<BranchData[]>(initialBranches);
   const [selectedBranch, setSelectedBranch] = useState<BranchData | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<
     "profile" | "manager" | "staff" | "schedule" | "counters" | "categories" | "devices"
   >("profile");
 
-  // Sync state when initialBranches changes from server
-  useEffect(() => {
+  // Segerakkan state apabila initialBranches berubah dari pelayan. Corak "simpan prop sebelumnya"
+  // daripada panduan React (setState semasa render) digunakan, bukan setState di dalam effect.
+  const [syncedBranches, setSyncedBranches] = useState(initialBranches);
+  if (initialBranches !== syncedBranches) {
+    setSyncedBranches(initialBranches);
     setBranches(initialBranches);
     if (selectedBranch) {
       const updated = initialBranches.find((b) => b.id === selectedBranch.id);
@@ -111,7 +112,7 @@ export default function BranchManagementClient({
         setSelectedBranch(updated);
       }
     }
-  }, [initialBranches]);
+  }
 
   // Add Branch Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -166,7 +167,7 @@ export default function BranchManagementClient({
   const [newCounterZone, setNewCounterZone] = useState("Zon Utama");
   const [newCatName, setNewCatName] = useState("");
   const [newCatPrefix, setNewCatPrefix] = useState("C");
-  const [newCatStartNo, setNewCatStartNo] = useState("3001");
+  const [newCatStartNo] = useState("3001");
   const [newCatMinutes, setNewCatMinutes] = useState("5");
   const [newCatNextId, setNewCatNextId] = useState("");
 

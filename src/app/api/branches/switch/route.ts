@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -45,9 +46,9 @@ export async function POST(req: NextRequest) {
         code: branch.code,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat menukar cawangan." },
+      { success: false, message: getErrorMessage(error, "Ralat menukar cawangan.") },
       { status: 500 }
     );
   }

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useLanguage } from "@/context/LanguageContext";
 
 interface BranchCardData {
   id: string;
@@ -73,14 +72,11 @@ interface DashboardClientProps {
 export default function DashboardClient({
   tenant,
   isTenantAdmin,
-  userRole,
-  userBranchId,
   branches,
   consolidatedMetrics,
   hourlyTraffic,
   latestTickets,
 }: DashboardClientProps) {
-  const { t } = useLanguage();
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("ALL");
   const [searchTicketQuery, setSearchTicketQuery] = useState("");
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);

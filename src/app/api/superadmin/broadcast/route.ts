@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Tapis sasaran penerima
-    let whereCondition: any = {};
+    let whereCondition: Prisma.TenantWhereInput = {};
     if (targetAudience === "TRIAL_USERS") {
       whereCondition = { subscriptions: { some: { status: "TRIAL" } } };
     } else if (targetAudience === "PRO_USERS") {
@@ -83,10 +85,10 @@ export async function POST(req: NextRequest) {
       sentCount,
       recipients: recipients.slice(0, 10), // Preview 10 penerima pertama
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Broadcast Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa menyiarkan hebahan." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa menyiarkan hebahan.") },
       { status: 500 }
     );
   }

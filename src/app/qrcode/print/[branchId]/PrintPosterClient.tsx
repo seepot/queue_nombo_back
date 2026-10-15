@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import QRCode from "qrcode";
 import Link from "next/link";
 
@@ -13,16 +13,20 @@ interface BranchData {
   tenantSlug: string;
 }
 
+// Asal (origin) pelayar hanya diketahui di klien; semasa SSR dan penghidratan nilainya kosong.
+const subscribeToNothing = () => () => {};
+const getBrowserOrigin = () => window.location.origin;
+const getServerOrigin = () => "";
+
 export default function PrintPosterClient({ branch }: { branch: BranchData }) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
-  const [scanUrl, setScanUrl] = useState<string>("");
+  const origin = useSyncExternalStore(subscribeToNothing, getBrowserOrigin, getServerOrigin);
+  const scanUrl = origin ? `${origin}/scan/${branch.tenantSlug}` : "";
 
   useEffect(() => {
-    const origin = window.location.origin;
-    const url = `${origin}/scan/${branch.tenantSlug}`;
-    setScanUrl(url);
+    if (!scanUrl) return;
 
-    QRCode.toDataURL(url, {
+    QRCode.toDataURL(scanUrl, {
       width: 450,
       margin: 2,
       color: {
@@ -32,7 +36,7 @@ export default function PrintPosterClient({ branch }: { branch: BranchData }) {
     })
       .then((dataUrl) => setQrDataUrl(dataUrl))
       .catch((err) => console.error("Error generating QR code:", err));
-  }, [branch.tenantSlug]);
+  }, [scanUrl]);
 
   const handlePrint = () => {
     window.print();
@@ -75,6 +79,7 @@ export default function PrintPosterClient({ branch }: { branch: BranchData }) {
         {/* Big Crisp QR Code */}
         <div className="p-4 bg-white rounded-3xl border-4 border-slate-900 shadow-lg inline-block my-2">
           {qrDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL kod QR dijana di klien; next/image tidak sesuai
             <img src={qrDataUrl} alt="Scan QR Code" className="w-64 h-64 sm:w-72 sm:h-72 mx-auto" />
           ) : (
             <div className="w-64 h-64 sm:w-72 sm:h-72 bg-slate-100 flex items-center justify-center text-slate-400 text-xs">

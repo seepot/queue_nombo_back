@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLanguage } from "@/context/LanguageContext";
 import { calculateTenantHealth } from "@/lib/tenant-health";
 import Link from "next/link";
 
@@ -83,7 +82,7 @@ interface AuditLogItem {
   id: string;
   action: string;
   status: string;
-  details: any;
+  details: unknown;
   createdAt: string;
 }
 
@@ -119,10 +118,11 @@ interface TenantDetails {
 
 export default function TenantProfileClient({ tenant }: { tenant: TenantDetails }) {
   const router = useRouter();
-  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "flags" | "quotas" | "security" | "billing" | "crm">("overview");
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  // Masa semasa diambil sekali semasa pemasangan supaya render kekal tulen
+  const [renderedAt] = useState(() => Date.now());
 
   // Health Score Calculation
   const health = calculateTenantHealth({
@@ -161,13 +161,13 @@ export default function TenantProfileClient({ tenant }: { tenant: TenantDetails 
   const [copiedPass, setCopiedPass] = useState(false);
 
   // Manual Payment Form State
-  const [manualPay, setManualPay] = useState({
+  const [manualPay, setManualPay] = useState(() => ({
     amount: tenant.planType === "ENTERPRISE" ? "7188.00" : tenant.planType === "PRO" ? "2388.00" : "948.00",
     planType: tenant.planType,
     billingCycle: "YEARLY",
     paymentMethod: "BANK_TRANSFER",
     referenceNo: `REF-${Date.now().toString().slice(-6)}`,
-  });
+  }));
 
   // CRM Notes State
   const [crmNotes, setCrmNotes] = useState(tenant.internalNotes || "");
@@ -186,6 +186,8 @@ export default function TenantProfileClient({ tenant }: { tenant: TenantDetails 
 
       const data = await res.json();
       if (data.success) {
+        // Muat semula penuh diperlukan supaya kuki penyamaran dibaca semula oleh komponen pelayan
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/dashboard";
       } else {
         setStatusMessage(data.message || "Gagal mengaktifkan penyamaran.");
@@ -470,7 +472,7 @@ export default function TenantProfileClient({ tenant }: { tenant: TenantDetails 
   let isExpired = false;
 
   if (endDate) {
-    const diffTime = endDate.getTime() - Date.now();
+    const diffTime = endDate.getTime() - renderedAt;
     daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     isExpired = daysRemaining <= 0;
   }

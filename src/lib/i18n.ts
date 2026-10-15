@@ -1,5 +1,8 @@
 export type Language = "ms" | "en";
 
+/** Kunci terjemahan yang sah (ditakrif daripada kamus Bahasa Melayu). */
+export type TranslationKey = keyof typeof translations.ms;
+
 export const translations = {
   ms: {
     // Brand & General

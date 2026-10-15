@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getErrorMessage } from "@/lib/errors";
 
 interface CategoryItem {
   id: string;
@@ -62,8 +63,8 @@ export default function ScanClient({ branch }: { branch: BranchData }) {
         // Terus redirect ke halaman tiket peribadi pelanggan
         router.push(`/ticket/${data.ticket.id}`);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Ralat rangkaian. Sila cuba sebentar lagi.");
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Ralat rangkaian. Sila cuba sebentar lagi."));
     } finally {
       setLoading(false);
     }

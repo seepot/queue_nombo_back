@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type BranchSettings } from "@/lib/settings";
 import BranchManagementClient from "./BranchManagementClient";
 
 export const metadata = {
@@ -69,7 +70,7 @@ export default async function BranchManagementPage() {
         where: { branchId: b.id, createdAt: { gte: today } },
       });
 
-      const settings = (b.settings as any) || {};
+      const settings = readJsonObject<BranchSettings>(b.settings);
       const manager = b.users.find((u) => u.role === "BRANCH_MANAGER") || null;
 
       return {

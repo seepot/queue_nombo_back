@@ -2,7 +2,11 @@
  * Penghantar e-mel ringkas tanpa dependensi tambahan.
  * - Jika RESEND_API_KEY ditetapkan: hantar melalui API HTTP Resend.
  * - Jika tidak: catat ke konsol (mod pembangunan) dan laporkan delivered=false.
+ *   Jika MAIL_OUTBOX_FILE turut ditetapkan, setiap e-mel ditambah ke fail itu (satu JSON
+ *   setiap baris) supaya ujian automatik boleh membaca kandungannya (cth. pautan tetapan semula).
  */
+import { appendFileSync } from "fs";
+
 export interface MailMessage {
   to: string;
   subject: string;
@@ -25,6 +29,17 @@ export function getMailFrom(): string {
   return process.env.MAIL_FROM || "QueNombo <no-reply@quenombo.com>";
 }
 
+/** Tulis e-mel ke MAIL_OUTBOX_FILE (mod CONSOLE sahaja); kegagalan menulis tidak menghalang aliran. */
+function appendToOutbox(message: MailMessage): void {
+  const outbox = process.env.MAIL_OUTBOX_FILE;
+  if (!outbox) return;
+  try {
+    appendFileSync(outbox, JSON.stringify({ ...message, sentAt: new Date().toISOString() }) + "\n");
+  } catch (error) {
+    console.error("[Mailer:CONSOLE] Gagal menulis MAIL_OUTBOX_FILE:", error);
+  }
+}
+
 export async function sendMail(message: MailMessage): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY;
 
@@ -32,6 +47,7 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
     console.log(
       `[Mailer:CONSOLE] Kepada: ${message.to}\n  Subjek: ${message.subject}\n  ${message.text || message.html}`
     );
+    appendToOutbox(message);
     return { delivered: false, provider: "CONSOLE" };
   }
 

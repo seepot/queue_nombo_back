@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { LeafletMouseEvent } from "leaflet";
 
 interface GeofenceMapPickerProps {
   latitude: number | null;
@@ -106,7 +107,7 @@ export default function GeofenceMapPicker({
         });
 
         // Event bila user klik pada mana-mana titik peta
-        map.on("click", (e: any) => {
+        map.on("click", (e: LeafletMouseEvent) => {
           const { lat, lng } = e.latlng;
           marker.setLatLng([lat, lng]);
           circle.setLatLng([lat, lng]);
@@ -123,6 +124,8 @@ export default function GeofenceMapPicker({
         mapInstanceRef.current = null;
       }
     };
+    // Peta dimulakan sekali sahaja; koordinat awal dan onLocationChange sengaja dibaca semasa pemasangan
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Kemas kini bulatan apabila radius bertukar dari slider/input

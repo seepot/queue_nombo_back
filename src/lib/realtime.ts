@@ -3,7 +3,7 @@
  */
 export async function broadcastToRealtime(
   endpoint: "publish/display" | "publish/device-paired",
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 ): Promise<boolean> {
   const realtimeUrl = process.env.REALTIME_SERVICE_URL;
   const realtimeSecret = process.env.REALTIME_SERVICE_SECRET;

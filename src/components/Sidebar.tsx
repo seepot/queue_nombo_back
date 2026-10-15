@@ -5,17 +5,18 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface NavItem {
   key: string;
-  labelKey: any;
+  labelKey: TranslationKey;
   href: string;
   icon: string;
   roles?: string[]; // "SUPERADMIN" | "TENANT_ADMIN" | "BRANCH_MANAGER" | "COUNTER_STAFF"
 }
 
 interface NavSection {
-  titleKey: any;
+  titleKey: TranslationKey;
   items: NavItem[];
 }
 
@@ -221,7 +222,7 @@ const icons: Record<string, React.ReactNode> = {
   ),
 };
 
-function getRoleMeta(role: string, t: (k: any) => string) {
+function getRoleMeta(role: string, t: (k: TranslationKey) => string) {
   switch (role) {
     case "SUPERADMIN":
       return { title: t("roleSuperadmin") || "Super Administrator", badge: "Superadmin", color: "bg-purple-500/20 text-purple-300 border-purple-400/30" };

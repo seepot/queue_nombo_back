@@ -2,6 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getErrorMessage } from "@/lib/errors";
+
+/** Temujanji yang dipulangkan oleh POST /api/appointments/book (medan yang dipaparkan sahaja). */
+interface BookedAppointment {
+  id: string;
+  appointmentDate: string;
+  timeSlot: string;
+  customerName: string;
+  category?: { name: string } | null;
+}
 
 interface CategoryOption {
   id: string;
@@ -30,13 +40,13 @@ export default function BookingClient({ branch }: { branch: BranchInfo }) {
   const [timeSlot, setTimeSlot] = useState("10:00");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [notes, setNotes] = useState("");
+  const [customerEmail] = useState("");
+  const [notes] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successData, setSuccessData] = useState<{
-    appointment: any;
+    appointment: BookedAppointment;
     googleCalendarUrl: string;
   } | null>(null);
 
@@ -76,8 +86,8 @@ export default function BookingClient({ branch }: { branch: BranchInfo }) {
           googleCalendarUrl: data.calendar?.googleCalendarUrl || "",
         });
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Ralat sambungan rangkaian.");
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Ralat sambungan rangkaian."));
     } finally {
       setLoading(false);
     }

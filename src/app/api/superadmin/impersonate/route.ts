@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -96,10 +97,10 @@ export async function POST(req: NextRequest) {
       message: `Mod penyamaran diaktifkan bagi '${tenant.name}'!`,
       tenant,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Impersonate POST Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa mengaktifkan penyamaran." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa mengaktifkan penyamaran.") },
       { status: 500 }
     );
   }
@@ -132,10 +133,10 @@ export async function DELETE() {
       success: true,
       message: "Mod penyamaran telah ditamatkan. Anda kembali sebagai SuperAdmin.",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Impersonate DELETE Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa menamatkan penyamaran." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa menamatkan penyamaran.") },
       { status: 500 }
     );
   }

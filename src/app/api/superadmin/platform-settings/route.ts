@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_PLATFORM_SETTINGS, readJsonObject, type PlatformSettings } from "@/lib/settings";
 
 export async function GET() {
   try {
@@ -21,11 +23,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    const settings = (latestSettingLog?.details as any) || {
-      announcementBanner: "",
-      announcementType: "INFO",
-      maintenanceMode: false,
-    };
+    const settings = latestSettingLog?.details
+      ? readJsonObject<PlatformSettings>(latestSettingLog.details)
+      : DEFAULT_PLATFORM_SETTINGS;
 
     return NextResponse.json({ success: true, settings });
   } catch (error) {
@@ -74,10 +74,10 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Tetapan global platform berjaya dikemas kini!",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Superadmin POST Platform Settings Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat menyimpan tetapan platform." },
+      { success: false, message: getErrorMessage(error, "Ralat menyimpan tetapan platform.") },
       { status: 500 }
     );
   }

@@ -1,18 +1,39 @@
 /**
- * Ujian aliran lupa / tetap semula kata laluan (jalankan semasa `npm run dev` aktif, tanpa RESEND_API_KEY).
+ * Ujian aliran lupa / tetap semula kata laluan (jalankan tanpa RESEND_API_KEY).
+ *  - Pelayan `npm run dev`: pautan tetapan semula dibaca daripada `devResetUrl` dalam respons.
+ *  - Pelayan produksi (`npm run start`, cth. CI): respons tidak mendedahkan pautan; tetapkan
+ *    MAIL_OUTBOX_FILE pada pelayan dan skrip ini, lalu pautan dibaca daripada e-mel terakhir
+ *    dalam fail itu.
  */
 require("dotenv").config();
+const fs = require("fs");
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3000";
 const EMAIL = process.env.TEST_RESET_EMAIL || "admin@demo.com";
+const OUTBOX = process.env.MAIL_OUTBOX_FILE;
 const ip = `203.0.113.${Math.floor(Math.random() * 200) + 1}`;
 
 function assert(cond, msg) {
   if (!cond) throw new Error(`❌ ${msg}`);
   console.log(`  ✅ ${msg}`);
+}
+
+/** Pautan tetapan semula daripada respons dev, atau daripada e-mel terakhir kepada EMAIL dalam MAIL_OUTBOX_FILE. */
+function findResetUrl(data) {
+  if (data.devResetUrl) return data.devResetUrl;
+  if (!OUTBOX || !fs.existsSync(OUTBOX)) return null;
+  const mails = fs
+    .readFileSync(OUTBOX, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((m) => m.to === EMAIL);
+  const last = mails[mails.length - 1];
+  const match = last && /https?:\/\/\S+\/reset-password\?token=[0-9a-f]+/.exec(last.text || last.html || "");
+  return match ? match[0] : null;
 }
 
 async function main() {
@@ -33,8 +54,9 @@ async function main() {
     });
     let data = await res.json();
     assert(res.status === 200 && data.success, "respons generik 200");
-    assert(data.devResetUrl, "pautan dev dipulangkan (mod tanpa e-mel)");
-    const token = new URL(data.devResetUrl).searchParams.get("token");
+    const resetUrl = findResetUrl(data);
+    assert(resetUrl, data.devResetUrl ? "pautan dev dipulangkan (mod tanpa e-mel)" : "pautan diperoleh daripada MAIL_OUTBOX_FILE");
+    const token = new URL(resetUrl).searchParams.get("token");
 
     console.log("[2/4] Semak token...");
     res = await fetch(`${BASE}/api/auth/reset-password?token=${token}`);

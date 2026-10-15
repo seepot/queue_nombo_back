@@ -46,3 +46,4 @@ next-env.d.ts
 # local runtime data & logs
 /logs/
 /aduan_store.json
+/.mail-outbox.jsonl

@@ -78,10 +78,7 @@ interface AdminCommandCenterClientProps {
   lockedStateCode?: string;
 }
 
-export default function AdminCommandCenterClient({
-  userLevel,
-  lockedStateCode,
-}: AdminCommandCenterClientProps) {
+export default function AdminCommandCenterClient({ lockedStateCode }: AdminCommandCenterClientProps) {
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { redis } from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type BranchSettings, type TenantSettings } from "@/lib/settings";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,16 +14,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 1. Semak cache Redis terlebih dahulu (<1ms)
-    let pairedCache = null;
-    try {
-      const raw = await redis.get(`device:paired:${deviceUid}`);
-      if (raw) pairedCache = JSON.parse(raw);
-    } catch {
-      // Abaikan jika Redis offline
-    }
-
-    // 2. Semak status dalam PostgreSQL
+    // Semak status dalam PostgreSQL
     const device = await prisma.device.findUnique({
       where: { deviceUid },
       include: {
@@ -60,8 +51,8 @@ export async function GET(req: NextRequest) {
 
     const branch = device.branch;
     const tenant = branch.tenant;
-    const tenantSettings = (tenant.settings as Record<string, any>) || {};
-    const branchSettings = (branch.settings as Record<string, any>) || {};
+    const tenantSettings = readJsonObject<TenantSettings>(tenant.settings);
+    const branchSettings = readJsonObject<BranchSettings>(branch.settings);
 
     return NextResponse.json({
       success: true,

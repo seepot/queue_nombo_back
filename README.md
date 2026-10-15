@@ -98,6 +98,31 @@ Skrip `test-*.js` lain menguji modul khusus (pendaftaran tenant, superadmin, per
 
 ---
 
+## Integrasi Berterusan (CI)
+
+Aliran kerja GitHub Actions `.github/workflows/ci.yml` berjalan pada setiap `push` dan *pull request* ke `main`:
+
+1. **Jenis & lint** — `npm ci`, `npx prisma generate`, `npx tsc --noEmit`, `npx eslint src --max-warnings=0`.
+2. **Ujian integrasi** — servis `postgres:16` dan `redis:7`, `npx prisma migrate deploy`, `node scripts/seed-superadmin.js`,
+   `npm run build && npm run start` di latar belakang, tunggu `/api/health`, kemudian lima skrip ujian integrasi di atas.
+
+Pelayan CI berjalan dalam mod produksi, maka `/api/auth/forgot-password` tidak memulangkan `devResetUrl`. Untuk ujian
+tetapan semula kata laluan, pelayan dan skrip ujian diberi `MAIL_OUTBOX_FILE`: dalam mod konsol (tanpa `RESEND_API_KEY`),
+setiap e-mel turut ditulis ke fail itu (satu JSON setiap baris) dan skrip membaca pautan daripadanya. Semua rahsia dalam
+aliran kerja hanyalah nilai ujian untuk pangkalan data sementara CI.
+
+Untuk meniru CI secara tempatan (pangkalan data bersih `quenombo_ci`):
+
+```bash
+createdb quenombo_ci
+export DATABASE_URL="postgresql://localhost:5432/quenombo_ci?schema=public" MAIL_OUTBOX_FILE="$PWD/.mail-outbox.jsonl"
+npx prisma migrate deploy && node scripts/seed-superadmin.js
+npm run build && npm run start -- -p 3100 &
+TEST_BASE_URL=http://localhost:3100 TEST_TENANT_SLUG=demo node scripts/test-password-reset.js
+```
+
+---
+
 ## Tugas Berjadual
 
 `GET /api/cron/subscriptions` menjalankan sapuan harian: menanda langganan tamat (`PAST_DUE` / `EXPIRED`) dan menghantar peringatan e-mel (percubaan hampir tamat, tempoh ihsan, tamat). Vercel Cron dikonfigurasi dalam `vercel.json`; pada PM2 / crontab, panggil endpoint ini dengan header `x-cron-secret`.

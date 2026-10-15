@@ -87,10 +87,7 @@ interface MalaysiaHeatmapClientProps {
   lockedStateCode?: string;
 }
 
-export default function MalaysiaHeatmapClient({
-  userLevel,
-  lockedStateCode,
-}: MalaysiaHeatmapClientProps) {
+export default function MalaysiaHeatmapClient({ lockedStateCode }: MalaysiaHeatmapClientProps) {
   const [data, setData] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTarikh, setSelectedTarikh] = useState(

@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  lint:
+    name: Jenis & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Jana klien Prisma
+        run: npx prisma generate
+
+      - name: Semak jenis TypeScript
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint src --max-warnings=0
+
+  integration:
+    name: Ujian integrasi
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: quenombo
+          POSTGRES_PASSWORD: quenombo
+          POSTGRES_DB: quenombo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quenombo -d quenombo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Nilai di bawah hanya untuk pangkalan data & Redis sementara dalam CI; bukan rahsia sebenar.
+    env:
+      DATABASE_URL: postgresql://quenombo:quenombo@localhost:5432/quenombo_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      AUTH_SECRET: ci-only-auth-secret-0123456789abcdef0123456789abcdef
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_APP_NAME: QueNombo CI
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      BILLING_SANDBOX_ENABLED: "true"
+      BILLING_WEBHOOK_SECRET: ci-only-billing-webhook-secret
+      CRON_SECRET: ci-only-cron-secret
+      MAIL_OUTBOX_FILE: ${{ github.workspace }}/.mail-outbox.jsonl
+      TEST_BASE_URL: http://localhost:3000
+      TEST_TENANT_SLUG: demo
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Migrasi pangkalan data
+        run: npx prisma migrate deploy
+
+      - name: Seed SuperAdmin & tenant demo
+        run: node scripts/seed-superadmin.js
+
+      - name: Bina aplikasi
+        run: npm run build
+
+      - name: Mulakan pelayan produksi di latar belakang
+        run: |
+          nohup npm run start > server.log 2>&1 &
+          echo $! > server.pid
+
+      - name: Tunggu /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health; then
+              echo
+              echo "Pelayan sedia selepas ${i} percubaan."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Pelayan tidak sedia dalam masa 120 saat." >&2
+          cat server.log >&2
+          exit 1
+
+      - name: Ujian penguatkuasaan langganan
+        run: node scripts/test-subscription-enforcement.js
+
+      - name: Ujian pembatalan langganan
+        run: node scripts/test-subscription-cancel.js
+
+      - name: Ujian had kadar & brute force
+        run: node scripts/test-rate-limit.js
+
+      - name: Ujian tetapan semula kata laluan
+        run: node scripts/test-password-reset.js
+
+      - name: Ujian keselamatan bil
+        run: node scripts/test-billing-security.js
+
+      - name: Log pelayan
+        if: always()
+        run: |
+          if [ -f server.pid ]; then kill "$(cat server.pid)" 2>/dev/null || true; fi
+          echo "::group::server.log"
+          cat server.log || true
+          echo "::endgroup::"

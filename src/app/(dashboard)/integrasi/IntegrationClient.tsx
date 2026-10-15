@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DEFAULT_TEMPLATES, WhatsAppMessageType } from "@/lib/whatsapp";
+import type { TenantSettings } from "@/lib/settings";
 
 export default function IntegrationClient({
   tenantId,
@@ -12,7 +13,7 @@ export default function IntegrationClient({
 }: {
   tenantId: string;
   tenantName: string;
-  initialSettings: any;
+  initialSettings: TenantSettings;
   whatsappQuota: number;
   whatsappUsed: number;
 }) {

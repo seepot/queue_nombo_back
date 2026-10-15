@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { isWithinLastMs } from "@/lib/date";
 import DeviceManagerClient from "./DeviceManagerClient";
 
 export const metadata = {
@@ -51,12 +52,10 @@ export default async function PerantiPage() {
     orderBy: { lastHeartbeat: "desc" },
   });
 
-  const now = Date.now();
   const twoMinutesMs = 2 * 60 * 1000;
 
   const devices = rawDevices.map((d) => {
-    const lastHbTime = d.lastHeartbeat ? new Date(d.lastHeartbeat).getTime() : 0;
-    const isOnline = now - lastHbTime < twoMinutesMs && d.isPaired;
+    const isOnline = isWithinLastMs(d.lastHeartbeat, twoMinutesMs) && d.isPaired;
 
     return {
       id: d.id,

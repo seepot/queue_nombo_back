@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { isWithinLastMs } from "@/lib/date";
+import { DEFAULT_PLATFORM_SETTINGS, readJsonObject, type PlatformSettings, type TenantSettings } from "@/lib/settings";
 import SuperadminClient from "./SuperadminClient";
 
 export const metadata = {
@@ -83,19 +85,17 @@ export default async function SuperadminPage() {
 
   // Kira Anggaran MRR
   let estimatedMRR = 0;
-  tenantsRaw.forEach((t: any) => {
+  tenantsRaw.forEach((t) => {
     const plan = t.planType;
     if (plan === "STARTER") estimatedMRR += 99;
     else if (plan === "PRO") estimatedMRR += 299;
     else if (plan === "ENTERPRISE") estimatedMRR += 799;
   });
 
-  const now = Date.now();
   const twoMinutesMs = 2 * 60 * 1000;
 
-  const devices = rawDevices.map((d: any) => {
-    const lastHbTime = d.lastHeartbeat ? new Date(d.lastHeartbeat).getTime() : 0;
-    const isOnline = now - lastHbTime < twoMinutesMs && d.isPaired;
+  const devices = rawDevices.map((d) => {
+    const isOnline = isWithinLastMs(d.lastHeartbeat, twoMinutesMs) && d.isPaired;
     return {
       id: d.id,
       deviceName: d.deviceName,
@@ -111,9 +111,9 @@ export default async function SuperadminPage() {
     };
   });
 
-  const onlineDevicesCount = devices.filter((d: any) => d.isOnline).length;
+  const onlineDevicesCount = devices.filter((d) => d.isOnline).length;
 
-  const tenants = tenantsRaw.map((t: any) => {
+  const tenants = tenantsRaw.map((t) => {
     const sub = t.subscriptions[0];
     return {
       id: t.id,
@@ -124,10 +124,10 @@ export default async function SuperadminPage() {
       planType: t.planType,
       status: t.status,
       createdAt: t.createdAt.toISOString(),
-      internalNotes: ((t.settings as any) || {}).internalNotes || "",
+      internalNotes: readJsonObject<TenantSettings>(t.settings).internalNotes || "",
       branchCount: t._count?.branches || 0,
       userCount: t._count?.users || 0,
-      ticketCount: t.branches.reduce((acc: number, b: any) => acc + (b.counters?.length || 0) * 10, 0),
+      ticketCount: t.branches.reduce((acc, b) => acc + (b.counters?.length || 0) * 10, 0),
       subscription: sub
         ? {
             id: sub.id,
@@ -143,7 +143,7 @@ export default async function SuperadminPage() {
             whatsappUsed: sub.whatsappUsed,
           }
         : null,
-      branches: t.branches.map((b: any) => ({
+      branches: t.branches.map((b) => ({
         id: b.id,
         name: b.name,
         code: b.code,
@@ -154,7 +154,7 @@ export default async function SuperadminPage() {
     };
   });
 
-  const transactions = rawTransactions.map((tx: any) => ({
+  const transactions = rawTransactions.map((tx) => ({
     id: tx.id,
     invoiceNo: tx.invoiceNo,
     tenantName: tx.tenant?.name || "Tidak Diketahui",
@@ -169,7 +169,7 @@ export default async function SuperadminPage() {
     createdAt: tx.createdAt.toISOString(),
   }));
 
-  const auditLogs = rawAuditLogs.map((log: any) => ({
+  const auditLogs = rawAuditLogs.map((log) => ({
     id: log.id,
     action: log.action,
     tenantName: log.tenant?.name || "Global / System",
@@ -179,11 +179,9 @@ export default async function SuperadminPage() {
     createdAt: log.createdAt.toISOString(),
   }));
 
-  const platformSettings = (latestSettingLog?.details as any) || {
-    announcementBanner: "",
-    announcementType: "INFO",
-    maintenanceMode: false,
-  };
+  const platformSettings = latestSettingLog?.details
+    ? readJsonObject<PlatformSettings>(latestSettingLog.details)
+    : DEFAULT_PLATFORM_SETTINGS;
 
   const metrics = {
     totalTenants: tenants.length,

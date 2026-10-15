@@ -150,12 +150,12 @@ export default function OnboardingClient({ branch }: { branch: BranchInfo }) {
           <div>
             <h2 className="text-lg font-bold text-gray-900">Langkah 2: Jenis Urusan / Kategori Perkhidmatan</h2>
             <p className="text-xs text-gray-500">
-              Pelanggan akan memilih kategori ini semasa mengambil nombor giliran (cth: Kod 'A' untuk Pertanyaan).
+              Pelanggan akan memilih kategori ini semasa mengambil nombor giliran (cth: Kod &apos;A&apos; untuk Pertanyaan).
             </p>
           </div>
 
           <div className="space-y-3">
-            {categories.map((cat, idx) => (
+            {categories.map((cat) => (
               <div
                 key={cat.id}
                 className="p-4 bg-gray-50 border border-gray-200 rounded-2xl flex items-center justify-between"

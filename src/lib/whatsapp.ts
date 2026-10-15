@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { getErrorMessage } from "@/lib/errors";
+import { readJsonObject, type TenantSettings } from "@/lib/settings";
 
 export type WhatsAppMessageType =
   | "TICKET_CREATED"
@@ -104,9 +106,9 @@ export async function sendWhatsAppNotification(
       success: true,
       messageId: `wamid_${Date.now()}_${Math.random().toString(36).substring(7)}`,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("[WhatsApp Send Error]:", error);
-    return { success: false, error: error.message || "Ralat penghantaran WhatsApp." };
+    return { success: false, error: getErrorMessage(error, "Ralat penghantaran WhatsApp.") };
   }
 }
 
@@ -116,14 +118,14 @@ export async function sendWhatsAppNotification(
 export async function dispatchWebhookEvent(
   tenantId: string,
   eventName: string,
-  payload: any
+  payload: unknown
 ): Promise<void> {
   try {
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
     });
 
-    const settings = (tenant?.settings as any) || {};
+    const settings = readJsonObject<TenantSettings>(tenant?.settings);
     const webhookUrl = settings.webhookUrl;
 
     if (!webhookUrl) return;

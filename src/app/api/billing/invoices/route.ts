@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       success: true,
       data: invoices,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Invoices List Error]:", error);
     return NextResponse.json(
       { success: false, message: "Ralat semasa mendapatkan senarai invois." },

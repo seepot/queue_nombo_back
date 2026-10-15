@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
+import type { PlanType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type TenantSettings } from "@/lib/settings";
 import { invalidateSubscriptionCache } from "@/lib/subscription";
 import { hashPassword } from "@/lib/password";
 import { generateInvoiceNo } from "@/lib/payment-gateway";
@@ -232,7 +235,7 @@ export async function PATCH(req: NextRequest) {
           where: { id: sub.id },
           data: {
             status: "ACTIVE",
-            planType: plan as any,
+            planType: plan as PlanType,
             billingCycle,
             endDate: newEndDate,
           },
@@ -243,7 +246,7 @@ export async function PATCH(req: NextRequest) {
         where: { id: tenantId },
         data: {
           status: "ACTIVE",
-          planType: plan as any,
+          planType: plan as PlanType,
         },
       });
 
@@ -267,7 +270,7 @@ export async function PATCH(req: NextRequest) {
     // 5. SAVE_CRM_NOTES
     if (action === "SAVE_CRM_NOTES") {
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-      const currentSettings = (tenant?.settings as any) || {};
+      const currentSettings = readJsonObject<TenantSettings>(tenant?.settings);
       const updatedSettings = { ...currentSettings, internalNotes: crmNotes || "" };
 
       await prisma.tenant.update({
@@ -369,7 +372,7 @@ export async function PATCH(req: NextRequest) {
     if (action === "UPDATE_FEATURE_FLAGS") {
       const { featureFlags } = body;
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-      const currentSettings = (tenant?.settings as any) || {};
+      const currentSettings = readJsonObject<TenantSettings>(tenant?.settings);
       const updatedSettings = { ...currentSettings, featureFlags: featureFlags || {} };
 
       await prisma.tenant.update({
@@ -417,10 +420,10 @@ export async function PATCH(req: NextRequest) {
       message: `Tenant '${updated.name}' berjaya dikemas kini.`,
       tenant: updated,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Superadmin PATCH Tenant Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa mengemas kini tenant." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa mengemas kini tenant.") },
       { status: 500 }
     );
   }

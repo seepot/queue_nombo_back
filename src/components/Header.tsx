@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKey } from "@/lib/i18n";
 
-function getRoleBadge(role: string, t: (k: any) => string) {
+function getRoleBadge(role: string, t: (k: TranslationKey) => string) {
   switch (role) {
     case "SUPERADMIN":
       return { label: t("roleSuperadmin") || "Superadmin", color: "bg-purple-100 text-purple-800 border-purple-200" };
@@ -21,7 +22,7 @@ function getRoleBadge(role: string, t: (k: any) => string) {
   }
 }
 
-function getBreadcrumb(pathname: string, t: (k: any) => string): { module: string; page: string } {
+function getBreadcrumb(pathname: string, t: (k: TranslationKey) => string): { module: string; page: string } {
   if (pathname === "/dashboard") return { module: "QueNombo", page: t("navDashboard") };
   if (pathname === "/superadmin") return { module: "SuperAdmin", page: t("navSuperadmin") };
   if (pathname === "/terminal") return { module: "Counter", page: t("navTerminal") };

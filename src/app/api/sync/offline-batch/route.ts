@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, message: "Akses tidak dibenarkan. Sila log masuk." },
+        { status: 401 }
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user = session.user as any;
+    const isSuperadmin = user.role === "SUPERADMIN";
+
+    if (!isSuperadmin && user.tenantId) {
+      const gate = await assertTenantOperational(user.tenantId);
+      if (!gate.ok) return subscriptionBlockedResponse(gate);
+    }
+
     const body = await req.json();
     const { tickets } = body;
 
@@ -25,6 +43,11 @@ export async function POST(req: NextRequest) {
 
         if (!category) {
           continue; // Langkau jika kategori tidak wujud
+        }
+
+        // Pengasingan tenant: hanya kategori milik tenant pengguna dibenarkan
+        if (!isSuperadmin && category.branch.tenantId !== user.tenantId) {
+          continue;
         }
 
         // Ekstrak seqNumber daripada ticketNo (cth: "A1002" -> 1002)

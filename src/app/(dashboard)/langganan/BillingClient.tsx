@@ -41,10 +41,14 @@ export default function BillingClient({
   subscription,
   usage,
   tenantName,
+  sandboxEnabled = false,
+  gatewayConfigured = false,
 }: {
   subscription: SubscriptionInfo;
   usage: QuotaUsage;
   tenantName: string;
+  sandboxEnabled?: boolean;
+  gatewayConfigured?: boolean;
 }) {
   const router = useRouter();
   const { language, t } = useLanguage();
@@ -103,6 +107,14 @@ export default function BillingClient({
       });
 
       const data = await res.json();
+      if (data.success && data.requiresRedirect && data.checkoutUrl) {
+        setFeedbackMessage({
+          type: "success",
+          text: language === "en" ? "Redirecting to the payment gateway..." : "Mengalihkan ke gerbang pembayaran...",
+        });
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       if (data.success) {
         setFeedbackMessage({ type: "success", text: data.message });
         setSelectedPlanForModal(null);
@@ -569,7 +581,8 @@ export default function BillingClient({
                   <input type="radio" checked={paymentMethod === "DUITNOW_QR"} onChange={() => setPaymentMethod("DUITNOW_QR")} />
                 </div>
 
-                {/* 4. Sandbox Test Mode */}
+                {/* 4. Sandbox Test Mode (hanya jika dibenarkan oleh persekitaran) */}
+                {sandboxEnabled && (
                 <div
                   onClick={() => setPaymentMethod("SANDBOX")}
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex items-center justify-between ${
@@ -587,6 +600,15 @@ export default function BillingClient({
                   </div>
                   <input type="radio" checked={paymentMethod === "SANDBOX"} onChange={() => setPaymentMethod("SANDBOX")} />
                 </div>
+                )}
+
+                {!gatewayConfigured && paymentMethod !== "SANDBOX" && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+                    {language === "en"
+                      ? "Online payment gateway is not activated yet. Please contact QueNombo support for manual payment."
+                      : "Gerbang pembayaran dalam talian belum diaktifkan. Sila hubungi sokongan QueNombo untuk pembayaran manual."}
+                  </p>
+                )}
               </div>
             </div>
 

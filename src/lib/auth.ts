@@ -1,8 +1,15 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { logAudit } from "@/lib/auditLogger";
+import { getClientIp } from "@/lib/rate-limit";
+import { checkLoginAllowed, clearLoginFailures, recordLoginFailure } from "@/lib/login-throttle";
+
+/** Ralat khas supaya klien menerima code="throttled" tanpa mendedahkan butiran akaun. */
+class LoginThrottledError extends CredentialsSignin {
+  code = "throttled";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -12,13 +19,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.username || !credentials?.password) {
           return null;
         }
 
         const username = credentials.username as string;
         const password = credentials.password as string;
+        const ip = request ? getClientIp(request) : "unknown";
+
+        // Perlindungan brute force: semak kunci sebelum menyentuh pangkalan data
+        const gate = await checkLoginAllowed(username, ip);
+        if (!gate.allowed) {
+          logAudit({
+            action: "LOG_MASUK",
+            username,
+            status: "FAILED",
+            details: { reason: "Terlalu banyak percubaan", blockedBy: gate.reason, ip, retryAfterSec: gate.retryAfterSec },
+          });
+          throw new LoginThrottledError();
+        }
 
         const user = await prisma.user.findFirst({
           where: {
@@ -31,11 +51,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         if (!user) {
+          const failure = await recordLoginFailure(username, ip);
           logAudit({
             action: "LOG_MASUK",
             username,
             status: "FAILED",
-            details: { reason: "Pengguna tidak wujud" },
+            details: { reason: "Pengguna tidak wujud", ip, locked: failure.userLocked || failure.ipLocked },
           });
           return null;
         }
@@ -43,13 +64,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Verify password against passwordHash
         const res = await verifyPassword(password, user.passwordHash);
         if (!res.valid) {
+          const failure = await recordLoginFailure(username, ip);
           logAudit({
             action: "LOG_MASUK",
             userId: user.id,
             username: user.username,
             cawangan: user.branch?.name || null,
             status: "FAILED",
-            details: { reason: "Kata laluan tidak sah" },
+            details: {
+              reason: "Kata laluan tidak sah",
+              ip,
+              attemptsLeft: failure.userAttemptsLeft,
+              locked: failure.userLocked || failure.ipLocked,
+            },
           });
           return null;
         }
@@ -67,11 +94,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         });
 
-        // Update last login
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLogin: new Date() },
-        });
+        // Update last login & padam kiraan kegagalan
+        await Promise.all([
+          prisma.user.update({
+            where: { id: user.id },
+            data: { lastLogin: new Date() },
+          }),
+          clearLoginFailures(username),
+        ]);
 
         logAudit({
           action: "LOG_MASUK",

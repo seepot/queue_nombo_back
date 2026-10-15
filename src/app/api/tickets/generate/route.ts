@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getNextTicketSequence } from "@/lib/redis";
+import { enforceIpRateLimit } from "@/lib/rate-limit";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function POST(req: NextRequest) {
   try {
+    // Had kadar: 30 tiket seminit bagi setiap IP (anti-spam kiosk/QR)
+    const limited = await enforceIpRateLimit(req, "tickets-generate", 30, 60);
+    if (limited) return limited;
+
     const body = await req.json();
     const {
       branchId,
@@ -42,6 +48,10 @@ export async function POST(req: NextRequest) {
 
     const branch = category.branch;
     const tenant = branch.tenant;
+
+    // Sekat jika langganan tenant tamat / digantung
+    const gate = await assertTenantOperational(tenant.id);
+    if (!gate.ok) return subscriptionBlockedResponse(gate);
 
     // 2. Jana nombor giliran secara atomik melalui Redis (<1ms)
     const { ticketNo, seqNumber } = await getNextTicketSequence(

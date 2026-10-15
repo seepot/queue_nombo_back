@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis } from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
+import { enforceIpRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = await enforceIpRateLimit(req, "devices-request-pin", 20, 60);
+    if (limited) return limited;
+
     const body = await req.json();
     const { deviceUid, deviceName = "Paparan Skrin TV", deviceType = "TV_DISPLAY" } = body;
 

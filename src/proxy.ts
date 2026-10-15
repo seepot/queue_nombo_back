@@ -16,6 +16,10 @@ export default auth((req) => {
   const publicRoutes = [
     "/api/auth",
     "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/api/cron",
+    "/api/health",
     "/images",
     "/api/tv",
     "/api/devices",

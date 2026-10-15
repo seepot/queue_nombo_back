@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import ReceiptClient from "./ReceiptClient";
+import { reconcilePendingTransaction } from "@/lib/payment-gateway";
 
 export const metadata = {
   title: "Invois & Resit Rasmi Langganan | QueNombo SaaS",
@@ -23,16 +24,31 @@ export default async function InvoiceReceiptPage({
   const user = session.user as any;
   const tenantId = user.tenantId;
 
-  const transaction = await prisma.paymentTransaction.findUnique({
-    where: { id },
-    include: {
-      tenant: true,
-      subscription: true,
-    },
-  });
+  const loadTransaction = () =>
+    prisma.paymentTransaction.findUnique({
+      where: { id },
+      include: {
+        tenant: true,
+        subscription: true,
+      },
+    });
+
+  let transaction = await loadTransaction();
 
   if (!transaction) {
     notFound();
+  }
+
+  // Selepas kembali dari gerbang: sahkan semula status terus dengan ToyyibPay
+  if (transaction.status === "PENDING" && transaction.gatewayProvider === "TOYYIBPAY" && transaction.billCode) {
+    try {
+      const result = await reconcilePendingTransaction(transaction.id);
+      if (result.status !== "PENDING" && result.status !== "UNKNOWN") {
+        transaction = (await loadTransaction()) ?? transaction;
+      }
+    } catch (error) {
+      console.error("[Invoice Page] Gagal mengesahkan semula transaksi:", error);
+    }
   }
 
   // Jika bukan superadmin, pastikan transaksi milik tenant semasa

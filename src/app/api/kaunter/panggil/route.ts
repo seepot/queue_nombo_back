@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,6 +33,17 @@ export async function POST(req: NextRequest) {
         { success: false, message: "action dan branchId diperlukan" },
         { status: 400 }
       );
+    }
+
+    // Sekat operasi kaunter jika langganan tenant tamat / digantung (SUPERADMIN dikecualikan)
+    if (user.role !== "SUPERADMIN") {
+      const gateTenantId =
+        user.tenantId ||
+        (await prisma.branch.findUnique({ where: { id: activeBranchId }, select: { tenantId: true } }))?.tenantId;
+      if (gateTenantId) {
+        const gate = await assertTenantOperational(gateTenantId);
+        if (!gate.ok) return subscriptionBlockedResponse(gate);
+      }
     }
 
     const now = new Date();

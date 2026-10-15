@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { enforceIpRateLimit } from "@/lib/rate-limit";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = await enforceIpRateLimit(req, "appointments-book", 10, 60);
+    if (limited) return limited;
+
     const body = await req.json();
     const {
       branchId,
@@ -33,6 +38,9 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
+
+    const gate = await assertTenantOperational(branch.tenantId);
+    if (!gate.ok) return subscriptionBlockedResponse(gate);
 
     const appointmentDate = new Date(`${rawDate}T00:00:00.000Z`);
 

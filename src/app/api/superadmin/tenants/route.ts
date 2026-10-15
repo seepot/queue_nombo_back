@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { invalidateSubscriptionCache } from "@/lib/subscription";
 import { hashPassword } from "@/lib/password";
 import { generateInvoiceNo } from "@/lib/payment-gateway";
 
@@ -102,6 +103,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: `Tempoh percubaan berjaya dilanjutkan sebanyak +${days} hari sehingga ${newEndDate.toLocaleDateString("ms-MY")}.`,
@@ -136,6 +138,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: "Kuota sumber organisasi berjaya dikemas kini!",
@@ -175,6 +178,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: `Kata laluan pentadbir (${adminUser.username}) berjaya diset semula!`,
@@ -252,6 +256,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: `Invois ${invoiceNo} berjaya direkodkan (RM ${amount.toFixed(2)}) & status langganan diaktifkan sehingga ${newEndDate.toLocaleDateString("ms-MY")}!`,
@@ -279,6 +284,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: "Nota CRM dalaman berjaya disimpan!",
@@ -316,6 +322,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: `Kata laluan bagi staf '${targetUser.name || targetUser.username}' berjaya diset semula!`,
@@ -351,6 +358,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: `Status akaun '${targetUser.username}' berjaya ditukar kepada ${updatedUser.status}!`,
@@ -378,6 +386,7 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
+      await invalidateSubscriptionCache(tenantId);
       return NextResponse.json({
         success: true,
         message: "Konfigurasi suis modul & ciri berjaya dikemas kini!",
@@ -402,6 +411,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
+    await invalidateSubscriptionCache(tenantId);
     return NextResponse.json({
       success: true,
       message: `Tenant '${updated.name}' berjaya dikemas kini.`,

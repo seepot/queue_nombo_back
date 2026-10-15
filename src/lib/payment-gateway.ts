@@ -1,4 +1,6 @@
 import { prisma } from "./prisma";
+import { invalidateSubscriptionCache } from "./subscription";
+import { isToyyibPayConfigured, verifyToyyibPayPayment } from "./payments/toyyibpay";
 
 export interface PlanPricing {
   name: string;
@@ -95,7 +97,7 @@ export async function handleSuccessfulPayment(params: {
   gatewayRef?: string;
   paymentMethod?: string;
 }) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Dapatkan transaksi
     const transaction = await tx.paymentTransaction.findUnique({
       where: { id: params.transactionId },
@@ -205,4 +207,88 @@ export async function handleSuccessfulPayment(params: {
 
     return updatedTransaction;
   });
+
+  await invalidateSubscriptionCache(result.tenantId);
+  return result;
+}
+
+// -----------------------------------------------------------------------------
+// Konfigurasi & utiliti gerbang pembayaran
+// -----------------------------------------------------------------------------
+
+/** Mod SANDBOX (aktif serta-merta tanpa bayaran) hanya dibenarkan di luar produksi atau jika diaktifkan secara eksplisit. */
+export function isBillingSandboxEnabled(): boolean {
+  const flag = process.env.BILLING_SANDBOX_ENABLED;
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+/** Benar jika sekurang-kurangnya satu gerbang pembayaran sebenar dikonfigurasi. */
+export function isPaymentGatewayConfigured(): boolean {
+  return isToyyibPayConfigured();
+}
+
+export const PAID_PLAN_TYPES = ["STARTER", "PRO", "ENTERPRISE"] as const;
+
+export function isValidPaidPlan(planType: unknown): planType is (typeof PAID_PLAN_TYPES)[number] {
+  return typeof planType === "string" && (PAID_PLAN_TYPES as readonly string[]).includes(planType.toUpperCase());
+}
+
+export function channelToPaymentMethod(channel?: string | null, fallback = "FPX"): string {
+  if (!channel) return fallback;
+  const c = String(channel).toUpperCase();
+  if (c.includes("CARD") || c === "1" || c.includes("CREDIT")) return "CARD";
+  if (c.includes("FPX") || c === "0") return "FPX";
+  return fallback;
+}
+
+export async function markTransactionFailed(transactionId: string, gatewayRef?: string | null) {
+  return prisma.paymentTransaction.update({
+    where: { id: transactionId },
+    data: {
+      status: "FAILED",
+      ...(gatewayRef ? { gatewayRef } : {}),
+    },
+  });
+}
+
+export type ReconcileStatus = "SUCCESS" | "PENDING" | "FAILED" | "UNKNOWN";
+
+/**
+ * Semak semula transaksi PENDING terus dengan gerbang pembayaran dan
+ * aktifkan langganan jika pembayaran disahkan. Selamat dipanggil berulang kali.
+ */
+export async function reconcilePendingTransaction(
+  transactionId: string
+): Promise<{ status: ReconcileStatus; transactionId: string }> {
+  const transaction = await prisma.paymentTransaction.findUnique({ where: { id: transactionId } });
+  if (!transaction) {
+    throw new Error("Transaksi tidak ditemui.");
+  }
+
+  if (transaction.status === "SUCCESS") return { status: "SUCCESS", transactionId };
+  if (transaction.status === "FAILED") return { status: "FAILED", transactionId };
+
+  if (transaction.gatewayProvider !== "TOYYIBPAY" || !transaction.billCode) {
+    return { status: "PENDING", transactionId };
+  }
+
+  const verification = await verifyToyyibPayPayment(transaction.billCode, Number(transaction.amount));
+
+  if (verification.paid) {
+    await handleSuccessfulPayment({
+      transactionId,
+      gatewayRef: verification.ref,
+      paymentMethod: channelToPaymentMethod(verification.channel, transaction.paymentMethod),
+    });
+    return { status: "SUCCESS", transactionId };
+  }
+
+  if (verification.status === "FAILED") {
+    await markTransactionFailed(transactionId, verification.ref);
+    return { status: "FAILED", transactionId };
+  }
+
+  return { status: verification.status === "PENDING" ? "PENDING" : "UNKNOWN", transactionId };
 }

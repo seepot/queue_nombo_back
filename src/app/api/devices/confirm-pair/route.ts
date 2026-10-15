@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { redis } from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
+import { checkTenantQuota } from "@/lib/quota";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,6 +66,30 @@ export async function POST(req: NextRequest) {
         { success: false, message: "Anda tiada kebenaran untuk cawangan ini." },
         { status: 403 }
       );
+    }
+
+    // 3b. Sekat jika langganan tenant tamat / digantung
+    if (userRole !== "SUPERADMIN") {
+      const gate = await assertTenantOperational(branch.tenantId);
+      if (!gate.ok) return subscriptionBlockedResponse(gate);
+    }
+
+    // 3c. Kuatkuasa kuota paparan TV untuk peranti baharu sahaja
+    const existingDevice = await prisma.device.findUnique({ where: { deviceUid }, select: { id: true } });
+    if (!existingDevice && (pinData.deviceType || "TV_DISPLAY") === "TV_DISPLAY") {
+      const quota = await checkTenantQuota(branch.tenantId, "displays");
+      if (!quota.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "QUOTA_EXCEEDED",
+            message: quota.message,
+            currentCount: quota.currentCount,
+            maxLimit: quota.maxLimit,
+          },
+          { status: 402 }
+        );
+      }
     }
 
     // 4. Kemas kini rekod peranti dalam pangkalan data PostgreSQL

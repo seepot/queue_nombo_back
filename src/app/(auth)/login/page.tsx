@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -42,7 +43,14 @@ function LoginForm() {
         redirect: false,
       });
 
-      if (!result || result.error) {
+      if (result?.code === "throttled") {
+        setError(
+          language === "en"
+            ? "Too many failed sign-in attempts. Please wait 15 minutes before trying again."
+            : "Terlalu banyak percubaan log masuk gagal. Sila tunggu 15 minit sebelum mencuba semula."
+        );
+        setLoading(false);
+      } else if (!result || result.error) {
         setError(
           language === "en"
             ? "Authentication failed. Please check your username or password."
@@ -196,9 +204,9 @@ function LoginForm() {
           />
           <span className="font-medium">{language === "en" ? "Remember me" : "Ingat saya"}</span>
         </label>
-        <span className="text-blue-600 font-bold hover:underline cursor-pointer">
+        <Link href="/forgot-password" className="text-blue-600 font-bold hover:underline cursor-pointer">
           {language === "en" ? "Forgot password?" : "Lupa kata laluan?"}
-        </span>
+        </Link>
       </div>
 
       {/* Submit Button */}

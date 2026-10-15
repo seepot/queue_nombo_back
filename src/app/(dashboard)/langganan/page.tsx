@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import BillingClient from "./BillingClient";
+import { isBillingSandboxEnabled, isPaymentGatewayConfigured } from "@/lib/payment-gateway";
 
 export const metadata = {
   title: "Pelan & Langganan | QueNombo SaaS",
@@ -61,6 +62,8 @@ export default async function BillingPage() {
       subscription={subscriptionInfo}
       usage={usage}
       tenantName={tenant?.name || "Organisasi Utama (Superadmin View)"}
+      sandboxEnabled={isBillingSandboxEnabled()}
+      gatewayConfigured={isPaymentGatewayConfigured()}
     />
   );
 }

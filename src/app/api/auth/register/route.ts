@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import { enforceIpRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Had pendaftaran: 5 akaun sejam bagi setiap IP (anti-abuse)
+    const limited = await enforceIpRateLimit(
+      req,
+      "tenant-register",
+      5,
+      60 * 60,
+      "Terlalu banyak pendaftaran dari rangkaian ini. Sila cuba semula dalam sejam."
+    );
+    if (limited) return limited;
+
     const body = await req.json();
     const {
       companyName,

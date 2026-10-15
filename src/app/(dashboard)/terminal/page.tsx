@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import TerminalClient from "./TerminalClient";
+import SubscriptionBlocked from "@/components/SubscriptionBlocked";
+import { assertTenantOperational } from "@/lib/subscription";
 
 export const metadata = {
   title: "Terminal Panggilan Kaunter | SmartQ Cloud",
@@ -45,6 +47,15 @@ export default async function TerminalPage() {
       },
     },
   });
+
+  // Sekat terminal kaunter jika langganan tenant tamat / digantung
+  const gateTenantId = user.tenantId || branch?.tenantId;
+  if (user.role !== "SUPERADMIN" && gateTenantId) {
+    const gate = await assertTenantOperational(gateTenantId);
+    if (!gate.ok) {
+      return <SubscriptionBlocked state={gate.state} role={user.role} />;
+    }
+  }
 
   // Dapatkan tiket yang sedang dipanggil / dilayan di kaunter pengguna ini jika ada
   const currentTicket = await prisma.ticket.findFirst({

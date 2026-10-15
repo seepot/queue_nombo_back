@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import KioskClient from "./KioskClient";
+import SubscriptionBlocked from "@/components/SubscriptionBlocked";
+import { assertTenantOperational } from "@/lib/subscription";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -33,6 +35,11 @@ export default async function KioskPage({ params }: { params: Promise<{ slug: st
 
   if (!tenant || tenant.branches.length === 0) {
     notFound();
+  }
+
+  const gate = await assertTenantOperational(tenant.id);
+  if (!gate.ok) {
+    return <SubscriptionBlocked state={gate.state} publicView />;
   }
 
   const branch = tenant.branches[0];

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { checkTenantQuota } from "@/lib/quota";
+import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
 
 export async function GET() {
   try {
@@ -34,7 +36,7 @@ export async function GET() {
 
     const subscription = tenantId
       ? await prisma.subscription.findFirst({
-          where: { tenantId, status: "ACTIVE" },
+          where: { tenantId, status: { in: ["ACTIVE", "TRIAL", "PAST_DUE"] } },
           orderBy: { createdAt: "desc" },
         })
       : null;
@@ -91,11 +93,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 0. Sekat jika langganan tenant tamat / digantung
+    if (user.role !== "SUPERADMIN") {
+      const gate = await assertTenantOperational(tenantId);
+      if (!gate.ok) return subscriptionBlockedResponse(gate);
+    }
+
     // 1. Semak had kuota cawangan langganan
     const [currentBranchCount, subscription] = await Promise.all([
       prisma.branch.count({ where: { tenantId } }),
       prisma.subscription.findFirst({
-        where: { tenantId, status: "ACTIVE" },
+        where: { tenantId, status: { in: ["ACTIVE", "TRIAL", "PAST_DUE"] } },
         orderBy: { createdAt: "desc" },
       }),
     ]);
@@ -204,6 +212,21 @@ export async function PATCH(req: NextRequest) {
     // A. TINDAKAN PENGURUSAN KAUNTER (ADD / UPDATE / DELETE COUNTER)
     if (action === "ADD_COUNTER") {
       const { counterNo, counterName, zone, priorityOrder } = body;
+
+      const quota = await checkTenantQuota(branch.tenantId, "counters");
+      if (!quota.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "QUOTA_EXCEEDED",
+            message: quota.message,
+            currentCount: quota.currentCount,
+            maxLimit: quota.maxLimit,
+          },
+          { status: 402 }
+        );
+      }
+
       const counter = await prisma.counter.create({
         data: {
           branchId,

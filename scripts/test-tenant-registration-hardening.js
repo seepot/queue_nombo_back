@@ -1,6 +1,9 @@
 /**
- * Ujian pengetatan aliran pendaftaran tenant
- * (jalankan semasa `npm run dev` aktif, tanpa RESEND_API_KEY supaya devVerifyUrl dipulangkan).
+ * Ujian pengetatan aliran pendaftaran tenant (jalankan tanpa RESEND_API_KEY).
+ *  - Pelayan `npm run dev`: pautan pengesahan dibaca daripada `devVerifyUrl` dalam respons.
+ *  - Pelayan produksi (`npm run start`, cth. CI): respons tidak mendedahkan pautan; tetapkan
+ *    MAIL_OUTBOX_FILE pada pelayan dan skrip ini, lalu pautan dibaca daripada e-mel terakhir
+ *    kepada alamat ujian dalam fail itu.
  *
  *  - kata laluan lemah ditolak
  *  - slug terpelihara / terlalu pendek ditolak
@@ -10,16 +13,18 @@
  *  - token tidak boleh diguna semula; tindakan bil dibuka selepas pengesahan
  *  - tenant ujian dibersihkan selepas selesai
  *
- * Pembolehubah: TEST_BASE_URL (lalai http://localhost:3000)
+ * Pembolehubah: TEST_BASE_URL (lalai http://localhost:3000), MAIL_OUTBOX_FILE (pilihan)
  */
 /* eslint-disable @typescript-eslint/no-require-imports -- skrip CommonJS dijalankan dengan `node` seperti scripts/test-*.js lain */
 require("dotenv").config();
+const fs = require("fs");
 const { PrismaClient } = require("@prisma/client");
 const Redis = require("ioredis");
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3000";
+const OUTBOX = process.env.MAIL_OUTBOX_FILE;
 const ip = `203.0.113.${Math.floor(Math.random() * 200) + 1}`;
 
 const stamp = Date.now().toString().slice(-6);
@@ -85,6 +90,21 @@ function registerPayload(overrides = {}) {
 
 const tokenOf = (url) => new URL(url).searchParams.get("token");
 
+/** Pautan pengesahan daripada respons dev (devVerifyUrl), atau daripada e-mel terakhir kepada `email` dalam MAIL_OUTBOX_FILE. */
+function findVerifyUrl(data, email) {
+  if (data && data.devVerifyUrl) return data.devVerifyUrl;
+  if (!OUTBOX || !fs.existsSync(OUTBOX)) return null;
+  const mails = fs
+    .readFileSync(OUTBOX, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((m) => m.to === email);
+  const last = mails[mails.length - 1];
+  const match = last && /https?:\/\/\S+\/verify-email\?token=[0-9a-f]+/.exec(last.text || last.html || "");
+  return match ? match[0] : null;
+}
+
 async function main() {
   console.log("==================================================================");
   console.log("  🛡️  UJIAN PENGETATAN PENDAFTARAN TENANT");
@@ -112,9 +132,15 @@ async function main() {
     console.log("[3/8] Pendaftaran sah menghantar pautan pengesahan...");
     r = await postJson("/api/auth/register", registerPayload());
     assert(r.status === 200 && r.data.success, `pendaftaran sah -> 200 (${r.data.message})`);
-    assert(r.data.devVerifyUrl, "devVerifyUrl dipulangkan (mod dev tanpa RESEND_API_KEY)");
     assert(r.data.verificationEmail?.sent === true, "e-mel pengesahan dicatat sebagai dihantar");
-    const token1 = tokenOf(r.data.devVerifyUrl);
+    const verifyUrl1 = findVerifyUrl(r.data, EMAIL);
+    assert(
+      verifyUrl1,
+      r.data.devVerifyUrl
+        ? "devVerifyUrl dipulangkan (mod dev tanpa RESEND_API_KEY)"
+        : "pautan pengesahan diperoleh daripada MAIL_OUTBOX_FILE (pelayan produksi)"
+    );
+    const token1 = tokenOf(verifyUrl1);
     assert(token1 && token1.length === 64, "token 32-bait (hex 64 aksara)");
     tenantId = r.data.data.tenantId;
 
@@ -139,8 +165,10 @@ async function main() {
     let data = await res.json();
     assert(data.valid === true, "token asal sah");
     r = await postJson("/api/auth/resend-verification", { identifier: EMAIL });
-    assert(r.status === 200 && r.data.success && r.data.devVerifyUrl, "hantar semula (awam) -> 200 + devVerifyUrl");
-    const token2 = tokenOf(r.data.devVerifyUrl);
+    assert(r.status === 200 && r.data.success, "hantar semula (awam) -> 200 mesej generik");
+    const verifyUrl2 = findVerifyUrl(r.data, EMAIL);
+    assert(verifyUrl2, r.data.devVerifyUrl ? "pautan baharu dipulangkan (devVerifyUrl)" : "pautan baharu diperoleh daripada MAIL_OUTBOX_FILE");
+    const token2 = tokenOf(verifyUrl2);
     assert(token2 && token2 !== token1, "token baharu berbeza daripada token asal");
     res = await fetch(`${BASE}/api/auth/verify-email?token=${token1}`);
     data = await res.json();

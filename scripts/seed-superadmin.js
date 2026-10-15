@@ -7,6 +7,9 @@ async function main() {
   console.log("🌱 Memulakan penjanaan akaun SuperAdmin dan data permulaan QueNombo...");
 
   const passwordHash = await bcrypt.hash("admin123", 10);
+  // Akaun seed ialah akaun sistem/demo: e-mel dianggap disahkan supaya tindakan bil
+  // (checkout, pembatalan) tidak disekat oleh gate pengesahan e-mel, termasuk dalam CI.
+  const emailVerifiedAt = new Date();
 
   // 1. Cipta akaun SuperAdmin
   const superadmin = await prisma.user.upsert({
@@ -15,6 +18,7 @@ async function main() {
       passwordHash,
       role: "SUPERADMIN",
       status: "ACTIVE",
+      emailVerifiedAt,
     },
     create: {
       username: "superadmin",
@@ -23,6 +27,7 @@ async function main() {
       passwordHash,
       role: "SUPERADMIN",
       status: "ACTIVE",
+      emailVerifiedAt,
     },
   });
   console.log(`✅ SuperAdmin sedia: username='${superadmin.username}', password='admin123'`);
@@ -147,6 +152,7 @@ async function main() {
       role: "TENANT_ADMIN",
       tenantId: tenant.id,
       branchId: branch.id,
+      emailVerifiedAt,
     },
     create: {
       username: "admin",
@@ -157,6 +163,7 @@ async function main() {
       tenantId: tenant.id,
       branchId: branch.id,
       status: "ACTIVE",
+      emailVerifiedAt,
     },
   });
 
@@ -168,6 +175,7 @@ async function main() {
       role: "COUNTER_STAFF",
       tenantId: tenant.id,
       branchId: branch.id,
+      emailVerifiedAt,
     },
     create: {
       username: "staf1",
@@ -178,6 +186,7 @@ async function main() {
       tenantId: tenant.id,
       branchId: branch.id,
       status: "ACTIVE",
+      emailVerifiedAt,
     },
   });
 

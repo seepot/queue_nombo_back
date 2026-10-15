@@ -16,6 +16,7 @@ const PUBLIC_ROUTES = [
   "/register",
   "/forgot-password",
   "/reset-password",
+  "/verify-email",
   "/api/cron",
   "/api/health",
   "/images",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSubscriptionState, invalidateSubscriptionCache } from "@/lib/subscription";
+import { requireVerifiedEmailForBilling } from "@/lib/email-verification";
 
 /**
  * POST /api/billing/cancel
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Pentadbir organisasi mesti mengesahkan e-mel sebelum mengubah langganan
+    const emailGate = await requireVerifiedEmailForBilling(user);
+    if (emailGate) return emailGate;
 
     const body = await req.json().catch(() => ({}));
     const action: string = body?.action;

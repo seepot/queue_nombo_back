@@ -23,6 +23,22 @@ export default function RegisterClient() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [devVerifyUrl, setDevVerifyUrl] = useState("");
+
+  // Peraturan sama seperti validateNewPassword() di pelayan: min 8 aksara, huruf & nombor
+  const passwordRuleError = (pw: string): string | null => {
+    if (pw.length < 8) {
+      return language === "en"
+        ? "Password must be at least 8 characters."
+        : "Kata laluan mesti sekurang-kurangnya 8 aksara.";
+    }
+    if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) {
+      return language === "en"
+        ? "Password must contain both letters and numbers."
+        : "Kata laluan mesti mengandungi huruf dan nombor.";
+    }
+    return null;
+  };
 
   const handleCompanyNameChange = (val: string) => {
     const autoSlug = val
@@ -48,11 +64,22 @@ export default function RegisterClient() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setErrorMessage(language === "en" ? "Password must be at least 6 characters." : "Kata laluan mestilah sekurang-kurangnya 6 aksara.");
+    const pwError = passwordRuleError(formData.password);
+    if (pwError) {
+      setErrorMessage(pwError);
       return;
     }
 
+    if (formData.slug.trim().length < 3) {
+      setErrorMessage(
+        language === "en"
+          ? "Subdomain / slug must be at least 3 characters."
+          : "Subdomain / slug syarikat mesti sekurang-kurangnya 3 aksara."
+      );
+      return;
+    }
+
+    setDevVerifyUrl("");
     setLoading(true);
 
     try {
@@ -69,12 +96,17 @@ export default function RegisterClient() {
       } else {
         setSuccessMessage(
           language === "en"
-            ? "Registration successful! Redirecting to login page..."
-            : "Pendaftaran berjaya! Mengarahkan anda ke halaman log masuk..."
+            ? `Registration successful! We sent a verification link to ${formData.email.trim()}. Redirecting to sign in...`
+            : `Pendaftaran berjaya! Pautan pengesahan telah dihantar ke ${formData.email.trim()}. Mengarahkan anda ke halaman log masuk...`
         );
-        setTimeout(() => {
-          router.push("/login?registered=true");
-        }, 1500);
+        if (data.devVerifyUrl) {
+          // Mod pembangunan tanpa RESEND_API_KEY: paparkan pautan dan jangan ubah hala
+          setDevVerifyUrl(data.devVerifyUrl);
+        } else {
+          setTimeout(() => {
+            router.push("/login?registered=true");
+          }, 2500);
+        }
       }
     } catch (err) {
       setErrorMessage(getErrorMessage(err, language === "en" ? "Network connection error." : "Ralat rangkaian semasa pendaftaran."));
@@ -134,6 +166,19 @@ export default function RegisterClient() {
           {successMessage && (
             <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-sm text-emerald-400 animate-in fade-in">
               {successMessage}
+              {devVerifyUrl && (
+                <div className="mt-3 text-xs text-emerald-300/90">
+                  <p className="font-bold uppercase tracking-wider text-[10px]">
+                    {language === "en" ? "Development mode: verification link" : "Mod pembangunan: pautan pengesahan"}
+                  </p>
+                  <a href={devVerifyUrl} className="block break-all font-mono text-emerald-200 underline mt-1">
+                    {devVerifyUrl}
+                  </a>
+                  <Link href="/login?registered=true" className="inline-block mt-2 font-bold text-blue-300 hover:text-blue-200">
+                    {language === "en" ? "Continue to sign in →" : "Teruskan ke log masuk →"}
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -166,6 +211,8 @@ export default function RegisterClient() {
                     <input
                       type="text"
                       required
+                      minLength={3}
+                      maxLength={40}
                       placeholder="dr-azman"
                       value={formData.slug}
                       onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
@@ -173,6 +220,11 @@ export default function RegisterClient() {
                     />
                     <span className="px-3 text-xs text-slate-400 font-mono">.quenombo.com</span>
                   </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {language === "en"
+                      ? "3-40 characters: lowercase letters, numbers and hyphens. System names (e.g. admin, api, www) are reserved."
+                      : "3-40 aksara: huruf kecil, nombor dan sengkang. Nama sistem (cth: admin, api, www) dikhaskan."}
+                  </p>
                 </div>
               </div>
             </div>
@@ -226,15 +278,22 @@ export default function RegisterClient() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    {language === "en" ? "Admin Email Address" : "Emel Pentadbir"}
+                    {language === "en" ? "Admin Email Address *" : "Emel Pentadbir *"}
                   </label>
                   <input
                     type="email"
+                    required
+                    autoComplete="email"
                     placeholder="azman@gmail.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-500"
                   />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {language === "en"
+                      ? "A verification link will be sent to this address."
+                      : "Pautan pengesahan akan dihantar ke alamat ini."}
+                  </p>
                 </div>
 
                 <div>
@@ -244,11 +303,16 @@ export default function RegisterClient() {
                   <input
                     type="password"
                     required
+                    minLength={8}
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-500"
                   />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {language === "en" ? "Min. 8 characters with letters and numbers." : "Min. 8 aksara dengan huruf dan nombor."}
+                  </p>
                 </div>
 
                 <div>
@@ -258,6 +322,8 @@ export default function RegisterClient() {
                   <input
                     type="password"
                     required
+                    minLength={8}
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}

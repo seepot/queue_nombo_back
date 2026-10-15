@@ -133,6 +133,9 @@ jobs:
       - name: Ujian tetapan semula kata laluan
         run: node scripts/test-password-reset.js
 
+      - name: Ujian pengetatan pendaftaran & pengesahan e-mel
+        run: node scripts/test-tenant-registration-hardening.js
+
       - name: Ujian keselamatan bil
         run: node scripts/test-billing-security.js
 

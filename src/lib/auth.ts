@@ -1,11 +1,8 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
-import { createHash } from "crypto";
-
-function sha1(input: string): string {
-  return createHash("sha1").update(input).digest("hex");
-}
+import { verifyPassword } from "@/lib/password";
+import { logAudit } from "@/lib/auditLogger";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -22,64 +19,81 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const username = credentials.username as string;
         const password = credentials.password as string;
-        const hashedPassword = sha1(password);
 
         const user = await prisma.user.findFirst({
           where: {
-            uname: username,
-            pass: hashedPassword,
+            username: username,
+          },
+          include: {
+            branch: true,
+            tenant: true,
           },
         });
 
         if (!user) {
+          logAudit({
+            action: "LOG_MASUK",
+            username,
+            status: "FAILED",
+            details: { reason: "Pengguna tidak wujud" },
+          });
+          return null;
+        }
+
+        // Verify password against passwordHash
+        const res = await verifyPassword(password, user.passwordHash);
+        if (!res.valid) {
+          logAudit({
+            action: "LOG_MASUK",
+            userId: user.id,
+            username: user.username,
+            cawangan: user.branch?.name || null,
+            status: "FAILED",
+            details: { reason: "Kata laluan tidak sah" },
+          });
           return null;
         }
 
         // Block inactive users
-        if (user.catatan === "inactive") {
+        if (user.status !== "ACTIVE") {
           return null;
         }
 
-        // Look up branch name
-        const cawangan = user.idCawangan
-          ? await prisma.cawangan.findFirst({
-              where: { idCawangan: user.idCawangan },
-            })
-          : null;
-
-        // Look up kaunter assignment (from jadual_tugasan)
-        const kaunterData = await prisma.$queryRaw<
-          Array<{
-            id_kaunter: number;
-            no_kaunter: string | null;
-            nama_kaunter: string | null;
-            susunan_keutamaan: string | null;
-          }>
-        >`
-          SELECT k.id as id_kaunter, k.no_kaunter, k.nama_kaunter, k.susunan_keutamaan
-           FROM kaunter k INNER JOIN jadual_tugasan j ON j.id_kaunter = k.id
-           WHERE j.nokp = ${username} LIMIT 1
-        `;
-
-        const kaunter = kaunterData[0] || null;
+        // Look up assigned counter if any
+        const counter = await prisma.counter.findFirst({
+          where: {
+            assignedUserId: user.id,
+            ...(user.branchId ? { branchId: user.branchId } : {}),
+          },
+        });
 
         // Update last login
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLogin: new Date(Date.now() + 8 * 60 * 60 * 1000) },
+          data: { lastLogin: new Date() },
+        });
+
+        logAudit({
+          action: "LOG_MASUK",
+          userId: user.id,
+          username: user.username,
+          userRole: user.role,
+          cawangan: user.branch?.name || null,
+          status: "SUCCESS",
+          details: { nama: user.name, cawangan: user.branch?.name },
         });
 
         return {
-          id: String(user.id),
-          name: user.nama,
-          email: null,
-          levelAkses: String(user.levelAkses || 3),
-          idCawangan: user.idCawangan || "0",
-          namaCawangan: cawangan?.namaCawangan || "",
-          noKaunter: kaunter?.no_kaunter || undefined,
-          seksyen: kaunter?.nama_kaunter || undefined,
-          idKaunter: kaunter ? Number(kaunter.id_kaunter) : undefined,
-          susunanKeutamaan: kaunter?.susunan_keutamaan || undefined,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId,
+          tenantName: user.tenant?.name || "",
+          branchId: user.branchId,
+          branchName: user.branch?.name || "",
+          counterNo: counter?.counterNo || undefined,
+          counterId: counter?.id || undefined,
         };
       },
     }),
@@ -90,13 +104,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const u = user as any;
         token.id = u.id;
-        token.levelAkses = u.levelAkses;
-        token.idCawangan = u.idCawangan;
-        token.namaCawangan = u.namaCawangan;
-        token.noKaunter = u.noKaunter;
-        token.seksyen = u.seksyen;
-        token.idKaunter = u.idKaunter;
-        token.susunanKeutamaan = u.susunanKeutamaan;
+        token.role = u.role;
+        token.tenantId = u.tenantId;
+        token.tenantName = u.tenantName;
+        token.branchId = u.branchId;
+        token.branchName = u.branchName;
+        token.counterNo = u.counterNo;
+        token.counterId = u.counterId;
       }
       return token;
     },
@@ -105,13 +119,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const s = session.user as any;
         s.id = token.id;
-        s.levelAkses = token.levelAkses;
-        s.idCawangan = token.idCawangan;
-        s.namaCawangan = token.namaCawangan;
-        s.noKaunter = token.noKaunter;
-        s.seksyen = token.seksyen;
-        s.idKaunter = token.idKaunter;
-        s.susunanKeutamaan = token.susunanKeutamaan;
+        s.role = token.role;
+        s.tenantId = token.tenantId;
+        s.tenantName = token.tenantName;
+        s.branchId = token.branchId;
+        s.branchName = token.branchName;
+        s.counterNo = token.counterNo;
+        s.counterId = token.counterId;
       }
       return session;
     },

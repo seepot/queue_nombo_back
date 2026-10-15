@@ -1,0 +1,178 @@
+{
+  "10": {
+    "code": "10",
+    "name": "Selangor",
+    "minX": 82.9,
+    "minY": 228.8,
+    "maxX": 138.6,
+    "maxY": 299.9,
+    "width": 55.7,
+    "height": 71.1,
+    "viewBox": "75 218 72 92"
+  },
+  "11": {
+    "code": "11",
+    "name": "Terengganu",
+    "minX": 158.3,
+    "minY": 111.8,
+    "maxX": 211.6,
+    "maxY": 228.1,
+    "width": 53.3,
+    "height": 116.3,
+    "viewBox": "150 94 69 151"
+  },
+  "12": {
+    "code": "12",
+    "name": "Sabah",
+    "minX": 780,
+    "minY": 33.4,
+    "maxX": 968.9,
+    "maxY": 217.8,
+    "width": 188.9,
+    "height": 184.4,
+    "viewBox": "752 6 246 240"
+  },
+  "13": {
+    "code": "13",
+    "name": "Sarawak",
+    "minX": 501.9,
+    "minY": 166.2,
+    "maxX": 796.2,
+    "maxY": 396.9,
+    "width": 294.3,
+    "height": 230.7,
+    "viewBox": "458 132 383 300"
+  },
+  "14": {
+    "code": "14",
+    "name": "WP Kuala Lumpur",
+    "minX": 121.4,
+    "minY": 263.6,
+    "maxX": 128.4,
+    "maxY": 275.3,
+    "width": 7,
+    "height": 11.7,
+    "viewBox": "120 262 9 15"
+  },
+  "15": {
+    "code": "15",
+    "name": "WP Labuan",
+    "minX": 769.8,
+    "minY": 143.7,
+    "maxX": 779.8,
+    "maxY": 155.3,
+    "width": 10,
+    "height": 11.6,
+    "viewBox": "768 142 13 15"
+  },
+  "16": {
+    "code": "16",
+    "name": "WP Putrajaya",
+    "minX": 123.6,
+    "minY": 278.3,
+    "maxX": 127.1,
+    "maxY": 284.3,
+    "width": 3.5,
+    "height": 6,
+    "viewBox": "123 277 5 8"
+  },
+  "02": {
+    "code": "02",
+    "name": "Kedah",
+    "minX": 26.8,
+    "minY": 79.4,
+    "maxX": 98,
+    "maxY": 161.4,
+    "width": 71.2,
+    "height": 82,
+    "viewBox": "16 67 93 107"
+  },
+  "03": {
+    "code": "03",
+    "name": "Kelantan",
+    "minX": 108.1,
+    "minY": 96.1,
+    "maxX": 172,
+    "maxY": 191.1,
+    "width": 63.9,
+    "height": 95,
+    "viewBox": "99 82 83 124"
+  },
+  "08": {
+    "code": "08",
+    "name": "Perak",
+    "minX": 61.4,
+    "minY": 113.6,
+    "maxX": 128.2,
+    "maxY": 240.1,
+    "width": 66.8,
+    "height": 126.5,
+    "viewBox": "51 95 87 164"
+  },
+  "07": {
+    "code": "07",
+    "name": "Pulau Pinang",
+    "minX": 52.4,
+    "minY": 132.9,
+    "maxX": 70.5,
+    "maxY": 158.9,
+    "width": 18.1,
+    "height": 26,
+    "viewBox": "50 129 24 34"
+  },
+  "05": {
+    "code": "05",
+    "name": "Negeri Sembilan",
+    "minX": 125.7,
+    "minY": 261.2,
+    "maxX": 173.6,
+    "maxY": 311.4,
+    "width": 47.9,
+    "height": 50.2,
+    "viewBox": "119 254 62 65"
+  },
+  "04": {
+    "code": "04",
+    "name": "Melaka",
+    "minX": 132.7,
+    "minY": 305.4,
+    "maxX": 168.4,
+    "maxY": 330.5,
+    "width": 35.7,
+    "height": 25.1,
+    "viewBox": "127 302 46 33"
+  },
+  "09": {
+    "code": "09",
+    "name": "Perlis",
+    "minX": 49.8,
+    "minY": 69.1,
+    "maxX": 61.8,
+    "maxY": 95.3,
+    "width": 12,
+    "height": 26.2,
+    "viewBox": "48 65 16 34"
+  },
+  "06": {
+    "code": "06",
+    "name": "Pahang",
+    "minX": 107.9,
+    "minY": 178.1,
+    "maxX": 246.7,
+    "maxY": 307.6,
+    "width": 138.8,
+    "height": 129.5,
+    "viewBox": "87 159 180 168"
+  },
+  "01": {
+    "code": "01",
+    "name": "Johor",
+    "minX": 162.5,
+    "minY": 286.7,
+    "maxX": 262.3,
+    "maxY": 374.3,
+    "width": 99.8,
+    "height": 87.6,
+    "viewBox": "148 274 130 114"
+  }
+}

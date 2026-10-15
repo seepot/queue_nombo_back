@@ -4,8 +4,33 @@ import { NextResponse } from "next/server";
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
+  // If already authenticated and accessing login page, redirect to dashboard
+  if (pathname === "/login") {
+    if (req.auth) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    return NextResponse.next();
+  }
+
   // Public routes
-  const publicRoutes = ["/login", "/api/auth"];
+  const publicRoutes = [
+    "/api/auth",
+    "/register",
+    "/images",
+    "/api/tv",
+    "/api/devices",
+    "/api/tickets",
+    "/ticket",
+    "/scan",
+    "/qrcode/print",
+    "/pricing",
+    "/api/billing/webhook",
+    "/api/branches",
+    "/book",
+    "/api/appointments",
+    "/api/feedback",
+    "/kiosk",
+  ];
   const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
 
   if (isPublic) {
@@ -20,10 +45,12 @@ export default auth((req) => {
   }
 
   // Role-based route protection
-  const levelAkses = req.auth.user.levelAkses;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const user = req.auth.user as any;
+  const userRole = user?.role;
 
-  // Superadmin routes (level 1)
-  if (pathname.startsWith("/superadmin") && levelAkses !== "1") {
+  // Superadmin routes
+  if (pathname.startsWith("/superadmin") && userRole !== "SUPERADMIN") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
@@ -31,5 +58,7 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

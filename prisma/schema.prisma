@@ -1,5 +1,5 @@
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -7,1267 +7,391 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Cawangan {
-  id             Int       @id @default(autoincrement())
-  idCawangan     String?   @map("id_cawangan") @db.VarChar(20)
-  namaCawangan   String    @map("nama_cawangan") @db.VarChar(200)
-  alamat1        String?   @db.VarChar(255)
-  alamat2        String?   @db.VarChar(255)
-  alamat3        String?   @db.VarChar(255)
-  alamat4        String?   @db.VarChar(200)
-  noTelefon      String?   @map("no_telefon") @db.VarChar(20)
-  noFaks         String?   @map("no_faks") @db.VarChar(20)
-  negeri         String?   @db.VarChar(10)
-  daerah         String?   @db.VarChar(10)
-  bilKaunter     Int?      @map("bil_kaunter")
-  playerId       String?   @map("player_id") @db.VarChar(200)
-  createDate     DateTime? @map("create_date")
-  latitud        String?   @db.VarChar(50)
-  longitud       String?   @db.VarChar(50)
-  updateDate     DateTime? @map("update_date")
-  updateBy       String?   @map("update_by") @db.VarChar(20)
-  selaMasa       Int?      @map("sela_masa")
-  flag           String?   @db.VarChar(5)
-  jenisLimit     Int?      @map("jenis_limit") // 1-cawangan; 2-perkhidmatan
-  tempohMulaScan Int?      @map("tempoh_mula_scan")
-  statusEq       Int?      @default(0) @map("status_eq")
-  radius         Int?
-  kodQR          String?   @db.VarChar(200)
-  tarikhJana     DateTime? @map("tarikh_jana")
-  namaQr         String?   @map("nama_qr") @db.VarChar(250)
-  gambarQr       String?   @map("gambar_qr") @db.Text
+// -----------------------------------------------------------------------------
+// 1. ENUMS
+// -----------------------------------------------------------------------------
 
-  @@map("cawangan")
+enum UserRole {
+  SUPERADMIN      // Pemilik platform SaaS (Level 1)
+  TENANT_ADMIN    // Pentadbir Syarikat / Organisasi (Level 2)
+  BRANCH_MANAGER  // Pengurus Cawangan (Level 3)
+  COUNTER_STAFF   // Staf Kaunter (Level 4)
 }
 
-model CutiUmum {
-  id          Int       @id @default(autoincrement())
-  cawangan    String?   @db.VarChar(20)
-  tarikh1     DateTime? @map("tarikh_1") @db.Date
-  statusAktif Int       @default(1) @map("status_aktif")
-  createDate  DateTime  @default(now()) @map("create_date")
-  keterangan  String?   @db.VarChar(200)
-  negeri      String?   @db.VarChar(10)
-  updateBy    String?   @map("updateby") @db.VarChar(20)
-  updateDate  DateTime? @map("updatedate")
-
-  @@map("cuti_umum")
+enum PlanType {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
 }
 
-model HadPelanggan {
-  id                   Int     @id @default(autoincrement())
-  cawangan             String  @db.VarChar(20)
-  bahagian             String? @db.VarChar(20)
-  kumpulanPerkhidmatan String? @map("kumpulan_perkhidmatan") @db.VarChar(20)
-  bilanganPelanggan    Int     @default(0) @map("bilangan_pelanggan")
-  statusAktif          Int     @default(1) @map("status_aktif")
-  hadPelanggan1        Int     @default(0) @map("had_pelanggan1")
-  hadPelanggan2        Int     @default(0) @map("had_pelanggan2")
-  hadPelanggan3        Int     @default(0) @map("had_pelanggan3")
-  jenisLimit           Int?    @default(1) @map("jenis_limit") // 1-cawangan; 2-perkhidmatan
-  tempohMulaScan       Int     @default(0) @map("tempoh_mula_scan")
-
-  @@map("had_pelanggan")
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
 }
 
-model HadTemujanji {
-  id           Int     @id @default(autoincrement())
-  cawangan     String? @db.VarChar(10)
-  bilTemujanji Int?    @map("bil_temujanji")
-  bilPlayerId  Int?    @map("bil_player_id")
-
-  @@map("had_temujanji")
+enum TicketStatus {
+  WAITING     // 0: Menunggu dalam barisan
+  CALLING     // 1: Sedang dipanggil di skrin TV / kaunter
+  SERVING     // 2: Sedang dilayan di kaunter
+  RECALLED    // 3: Panggilan semula
+  TRANSFERRED // 4: Dipindahkan ke kaunter/kategori lain
+  COMPLETED   // 5: Selesai urusan
+  NO_SHOW     // 6: Tidak hadir selepas dipanggil
+  CANCELLED   // 7: Dibatalkan (oleh staf atau pelanggan)
 }
 
-model HariCuti {
-  id         Int      @id @default(autoincrement())
-  cawangan   String?  @db.VarChar(20)
-  namaHari   String?  @map("nama_hari") @db.VarChar(3)
-  createDate DateTime @default(now()) @updatedAt @map("create_date")
-
-  @@map("hari_cuti")
+enum CounterStatus {
+  OPEN
+  CLOSED
+  PAUSED
 }
 
-model JadualTugasan {
-  id          Int       @id @default(autoincrement())
-  nokp        String?   @db.VarChar(20)
-  idKaunter   Int?      @map("id_kaunter")
-  idCawangan  String?   @map("id_cawangan") @db.VarChar(10)
-  tarikhMula  DateTime? @map("tarikh_mula") @db.Date
-  tarikhTamat DateTime? @map("tarikh_tamat") @db.Date
-  statusAktif Int?      @default(1) @map("status_aktif")
-  createDate  DateTime? @map("create_date")
-  updateDate  DateTime  @default(now()) @map("update_date")
+// -----------------------------------------------------------------------------
+// 2. TENANT & SUBSCRIPTION (MULTI-TENANCY CORE)
+// -----------------------------------------------------------------------------
 
-  @@map("jadual_tugasan")
+model Tenant {
+  id            String         @id @default(uuid())
+  name          String         // Cth: "Klinik Pakar Dr. Azman"
+  slug          String         @unique // Cth: "dr-azman" -> dr-azman.smartq.com
+  email         String?
+  phone         String?
+  planType      PlanType       @default(FREE)
+  status        String         @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
+  settings      Json?          // Branding: logo, warna tema, video promo URL, waktu operasi default
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  users         User[]
+  branches      Branch[]
+  subscriptions Subscription[]
+  transactions  PaymentTransaction[]
+  auditLogs     AuditLog[]
+
+  @@map("tenants")
 }
 
-model Kaunter {
-  id                     Int       @id @default(autoincrement())
-  noKaunter              String?   @map("no_kaunter") @db.VarChar(11)
-  namaKaunter            String?   @map("nama_kaunter") @db.VarChar(100)
-  idPerkhidmatanKumpulan Int?      @map("id_perkhidmatan_kumpulan")
-  idCawangan             String?   @map("id_cawangan") @db.VarChar(20)
-  noSiri                 Int?      @map("no_siri")
-  susunanKeutamaan       String?   @map("susunan_keutamaan") @db.VarChar(35)
-  idPengguna             String?   @map("id_pengguna") @db.VarChar(11)
-  transid                String?   @db.VarChar(20)
-  noTiket                Int?      @map("no_tiket")
-  masaPanggil            DateTime? @map("masa_panggil")
-  masaSelesai            DateTime? @map("masa_selesai")
-  masaBatal              DateTime? @map("masa_batal")
-  bilanganPelanggan      Int?      @map("bilangan_pelanggan")
-  masaMenunggu           DateTime? @map("masa_menunggu") @db.Time
-  waktuMula              DateTime? @map("waktu_mula")
-  zon                    String?   @db.VarChar(25)
+model Subscription {
+  id              String             @id @default(uuid())
+  tenantId        String             @map("tenant_id")
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planType        PlanType           @default(FREE) @map("plan_type")
+  status          SubscriptionStatus @default(TRIAL)
+  startDate       DateTime           @default(now()) @map("start_date")
+  endDate         DateTime?          @map("end_date")
+  maxBranches     Int                @default(1) @map("max_branches")
+  maxCounters     Int                @default(2) @map("max_counters")
+  maxDisplays     Int                @default(1) @map("max_displays")
+  whatsappQuota   Int                @default(0) @map("whatsapp_quota")
+  whatsappUsed    Int                @default(0) @map("whatsapp_used")
+  billingCycle    String             @default("MONTHLY") @map("billing_cycle") // MONTHLY, YEARLY
+  paymentProvider String?            @map("payment_provider") // STRIPE, BILLPLZ, TOYYIBPAY
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  @@map("kaunter")
+  transactions    PaymentTransaction[]
+
+  @@map("subscriptions")
 }
 
-model KaunterStat {
-  id                    Int       @id @default(autoincrement())
-  cawangan              String?   @db.VarChar(20)
-  tarikh                DateTime? @db.Date
-  kaunter               String?   @db.VarChar(10)
-  bilTiket              Int?      @map("bil_tiket")
-  bilSelesai            Int?      @map("bil_selesai")
-  bilBatal              Int?      @map("bil_batal")
-  bilLain               Int?      @map("bil_lain")
-  batalCust             Int?      @map("batal_cust")
-  batalKaunter          Int?      @map("batal_kaunter")
-  purataMasaMenunggu    DateTime? @map("purata_masa_menunggu") @db.Time
-  purataMasaLayanan     DateTime? @map("purata_masa_layanan") @db.Time
-  masaMenungguTerlama   DateTime? @map("masa_menunggu_terlama") @db.Time
-  masaLayananTerlama    DateTime? @map("masa_layanan_terlama") @db.Time
-  jumlahMasaKeseluruhan DateTime? @map("jumlah_masa_keseluruhan") @db.Time
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("kaunter_stat")
-}
-
-model KumpulanPerkhidmatan {
-  id             Int       @id @default(autoincrement())
-  idPerkhidmatan String?   @map("id_perkhidmatan") @db.Text
-  idCawangan     String?   @map("id_cawangan") @db.VarChar(20)
-  keterangan     String?   @db.VarChar(255)
-  noSiri         Int       @map("no_siri")
-  noTerkini      Int       @map("no_terkini")
-  kategori       Int       @default(1)
-  ispelbagai     Int?      @default(0)
-  createDate     DateTime? @map("create_date")
-  status         Int?      @default(1) // 1-aktif; 0-tidak aktif
-
-  @@index([idCawangan])
-  @@map("kumpulan_perkhidmatan")
-}
-
-model LevelAkses {
-  id          Int     @id @default(autoincrement())
-  keterangan  String? @db.VarChar(200)
-  statusAktif Int?    @default(1) @map("status_aktif")
-
-  @@map("level_akses")
-}
-
-model LogJadualTugasan {
-  id          Int       @id @default(autoincrement())
-  nokp        String?   @db.VarChar(20)
-  idKaunter   Int?      @map("id_kaunter")
-  idCawangan  String?   @map("id_cawangan") @db.VarChar(10)
-  tarikhMula  DateTime? @map("tarikh_mula") @db.Date
-  tarikhTamat DateTime? @map("tarikh_tamat") @db.Date
-  createDate  DateTime? @map("create_date")
-  updateDate  DateTime  @default(now()) @map("update_date")
-
-  @@map("log_jadual_tugasan")
-}
-
-model LogTiket {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int? // kaunter terkini
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by") // 1-pengguna, 2-kaunter
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket") // 0-baru, 1-dah panggil, 2-panggil semula, 3-transfer, 4-selesai, 5-batal
-  batalOleh            Int       @default(0) @map("batal_oleh") // 0-tiada batal, 1-kaunter, 2-pelanggan
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket") // 1-manual, null-hp
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "no_siri")
-  @@unique([noTiket, id], map: "no_tiket")
-  @@unique([kaunter, id], map: "log_tiket_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "log_tiket_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "log_tiket_cawangan")
-  @@index([uuid], map: "idx_uuid")
-  @@map("log_tiket")
-}
-
-model LogTransaksi {
-  id        Int       @id @default(autoincrement())
-  ip        String?   @db.VarChar(100)
-  device    String?   @db.VarChar(255)
-  tarikh    DateTime?
-  direction Int? // 1-from device, 2-to device
-  module    String?   @db.VarChar(200)
-  data      String?   @db.Text
-
-  @@map("log_transaksi")
-}
-
-model LogTransaksiMasaMenunggu {
-  id        Int       @id @default(autoincrement())
-  ip        String?   @db.VarChar(100)
-  device    String?   @db.VarChar(255)
-  tarikh    DateTime?
-  direction Int? // 1-from device, 2-to device
-  module    String?   @db.VarChar(200)
-  data      String?   @db.Text
-
-  @@map("log_transaksi_masamenunggu")
-}
-
-model Pengumuman {
-  id       Int      @id @default(autoincrement())
-  cawangan String   @db.VarChar(10)
-  catatan  String   @db.Text
-  trhMula  DateTime @map("trh_mula") @db.Date
-  trhTamat DateTime @map("trh_tamat") @db.Date
-
-  @@map("pengumuman")
-}
-
-model Peralatan {
-  id       Int     @id @default(autoincrement())
-  playerId String? @map("player_id") @db.VarChar(200)
-  ip       String? @db.VarChar(100)
-
-  @@map("peralatan")
-}
-
-model Perkhidmatan {
-  id         Int     @id @default(autoincrement())
-  keterangan String? @db.VarChar(500)
-
-  @@map("perkhidmatan")
-}
-
-model PerkhidmatanStat {
-  id                    Int       @id @default(autoincrement())
-  cawangan              String?   @db.VarChar(20)
-  tarikh                DateTime? @db.Date
-  kumpulanPerkhidmatan  String?   @map("kumpulan_perkhidmatan") @db.VarChar(10)
-  keterangan            String?   @db.VarChar(200)
-  bilTiket              Int?      @map("bil_tiket")
-  bilSelesai            Int?      @map("bil_selesai")
-  bilBatal              Int?      @map("bil_batal")
-  bilLain               Int?      @map("bil_lain")
-  batalCust             Int?      @map("batal_cust")
-  batalKaunter          Int?      @map("batal_kaunter")
-  purataMasaMenunggu    DateTime? @map("purata_masa_menunggu") @db.Time
-  purataMasaLayanan     DateTime? @map("purata_masa_layanan") @db.Time
-  masaMenungguTerlama   DateTime? @map("masa_menunggu_terlama") @db.Time
-  masaLayananTerlama    DateTime? @map("masa_layanan_terlama") @db.Time
-  jumlahMasaKeseluruhan DateTime? @map("jumlah_masa_keseluruhan") @db.Time
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("perkhidmatan_stat")
-}
-
-model Ref {
-  id         Int     @id @default(autoincrement())
-  kod        String  @db.VarChar(20)
-  keterangan String  @db.VarChar(255)
-  nilai      String? @db.VarChar(100)
-  jenis      Int
-
-  @@map("ref")
-}
-
-model TempahanBatal {
-  id              Int       @id @default(autoincrement())
-  idTempahan      Int?      @map("id_tempahan")
-  tempahanMasaId  Int?      @map("tempahan_masa_id")
-  cawangan        String?   @db.VarChar(100)
-  urusniaga       Int?
-  kategori        Int?
-  nopengenalan    String?   @db.VarChar(20)
-  nama            String?   @db.VarChar(200)
-  notelefon       String?   @db.VarChar(20)
-  emel            String?   @db.VarChar(50)
-  playerId        String?   @map("player_id") @db.VarChar(100)
-  hash            String?   @db.VarChar(100)
-  isPending       Int?      @map("is_pending")
-  createDate      DateTime? @map("create_date")
-  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
-  webToken        String?   @map("web_token") @db.VarChar(100)
-  firstId         Int?      @map("first_id")
-  firstMasaId     Int?      @map("first_masa_id")
-  remarks         String?   @db.VarChar(255)
-
-  @@index([kategori])
-  @@index([nopengenalan])
-  @@index([cawangan])
-  @@index([tempahanMasaId])
-  @@map("tempahan_batal")
-}
-
-model TempahanList {
-  id              Int       @id @default(autoincrement())
-  tempahanMasaId  Int?      @map("tempahan_masa_id")
-  cawangan        String?   @db.VarChar(100)
-  urusniaga       Int?
-  kategori        Int?
-  nopengenalan    String?   @db.VarChar(20)
-  nama            String?   @db.VarChar(200)
-  notelefon       String?   @db.VarChar(20)
-  emel            String?   @db.VarChar(50)
-  playerId        String?   @map("player_id") @db.VarChar(100)
-  hash            String?   @db.VarChar(100)
-  isPending       Int?      @map("is_pending")
-  createDate      DateTime? @map("create_date")
-  batal           String?   @db.VarChar(3)
-  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
-  webToken        String?   @map("web_token") @db.VarChar(100)
-  firstId         Int?      @map("first_id")
-  firstMasaId     Int?      @map("first_masa_id")
-  tempId          Int?      @map("temp_id")
-
-  @@index([kategori])
-  @@index([nopengenalan])
-  @@index([cawangan])
-  @@index([tempahanMasaId])
-  @@map("tempahan_list")
-}
-
-model TempahanListTemp {
-  id              Int       @id @default(autoincrement())
-  idList          Int?      @map("id_list")
-  tempahanMasaId  Int?      @map("tempahan_masa_id")
-  cawangan        String?   @db.VarChar(100)
-  urusniaga       Int?
-  kategori        Int?
-  nopengenalan    String?   @db.VarChar(20)
-  nama            String?   @db.VarChar(200)
-  notelefon       String?   @db.VarChar(20)
-  emel            String?   @db.VarChar(50)
-  playerId        String?   @map("player_id") @db.VarChar(100)
-  hash            String?   @db.VarChar(100)
-  isPending       Int?      @map("is_pending")
-  createDate      DateTime? @map("create_date")
-  batal           Int?
-  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
-  webToken        String?   @map("web_token") @db.VarChar(100)
-  firstId         Int?      @map("first_id")
-  firstMasaId     Int?      @map("first_masa_id")
-
-  @@map("tempahan_list_temp")
-}
-
-model TempahanMasa {
-  id               Int     @id @default(autoincrement())
-  cawangan         String? @db.VarChar(200)
-  kumpPerkhidmatan String? @map("kump_perkhidmatan") @db.VarChar(30)
-  tarikh           String? @db.VarChar(30)
-  masa             String? @db.VarChar(30)
-  bilangan         Int?
-  status           Int?
-  bilTlhIsi        Int?    @default(0) @map("bil_tlh_isi")
-  bukaTempahan     Int?    @map("buka_tempahan")
-
-  @@index([cawangan])
-  @@index([kumpPerkhidmatan])
-  @@map("tempahan_masa")
-}
-
-model TempahanRate {
-  id         Int      @id @default(autoincrement())
-  idTempahan Int      @map("id_tempahan")
-  rate       Int
-  comment    String?  @db.Text
-  createDate DateTime @map("create_date")
-
-  @@map("tempahan_rate")
-}
-
-model TempahanTarikh {
-  id               Int     @id @default(autoincrement())
-  cawangan         String? @db.VarChar(100)
-  kumpPerkhidmatan String? @map("kump_perkhidmatan") @db.VarChar(20)
-  hadMax           String? @map("had_max") @db.VarChar(5)
-  tarikh           String? @db.VarChar(20)
-  status           Int?    @default(0)
-  cttnBatal        String? @map("cttn_batal") @db.Text
-  nyahaktif        Int?
-  bukaTempahan     Int?    @map("buka_tempahan")
-
-  @@index([kumpPerkhidmatan])
-  @@index([cawangan])
-  @@map("tempahan_tarikh")
-}
-
-model TempahanTemp {
-  id              Int       @id @default(autoincrement())
-  tempahanMasaId  Int?      @map("tempahan_masa_id")
-  cawangan        String?   @db.VarChar(100)
-  urusniaga       Int?
-  kategori        Int?
-  nopengenalan    String?   @db.VarChar(20)
-  nama            String?   @db.VarChar(200)
-  notelefon       String?   @db.VarChar(20)
-  emel            String?   @db.VarChar(50)
-  playerId        String?   @map("player_id") @db.VarChar(100)
-  hash            String?   @db.VarChar(100)
-  isPending       Int?      @map("is_pending")
-  createDate      DateTime? @map("create_date")
-  batal           Int?
-  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
-  webToken        String?   @map("web_token") @db.VarChar(100)
-  firstId         Int?      @map("first_id")
-  firstMasaId     Int?      @map("first_masa_id")
-  tempId          Int?      @map("temp_id")
-  updateList      Int?      @map("update_list")
-
-  @@index([nopengenalan])
-  @@index([kategori])
-  @@index([cawangan])
-  @@index([tempahanMasaId])
-  @@map("tempahan_temp")
-}
-
-model TempahanTemp2 {
-  id              Int       @id @default(autoincrement())
-  tempahanMasaId  Int?      @map("tempahan_masa_id")
-  cawangan        String?   @db.VarChar(100)
-  urusniaga       Int?
-  kategori        Int?
-  nopengenalan    String?   @db.VarChar(20)
-  nama            String?   @db.VarChar(200)
-  notelefon       String?   @db.VarChar(20)
-  emel            String?   @db.VarChar(50)
-  playerId        String?   @map("player_id") @db.VarChar(100)
-  hash            String?   @db.VarChar(100)
-  isPending       Int?      @map("is_pending")
-  createDate      DateTime? @map("create_date")
-  batal           Int?
-  tujuanTransaksi String?   @map("tujuan_transaksi") @db.VarChar(255)
-  webToken        String?   @map("web_token") @db.VarChar(100)
-  firstId         Int?      @map("first_id")
-  firstMasaId     Int?      @map("first_masa_id")
-  updateList      Int?      @map("update_list")
-
-  @@map("tempahan_temp2")
-}
-
-model Tiket01 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_01_no_siri")
-  @@unique([noTiket, id], map: "tiket_01_no_tiket")
-  @@unique([kaunter, id], map: "tiket_01_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_01_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_01_cawangan")
-  @@map("tiket_01")
-}
-
-model Tiket02 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_02_no_siri")
-  @@unique([noTiket, id], map: "tiket_02_no_tiket")
-  @@unique([kaunter, id], map: "tiket_02_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_02_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_02_cawangan")
-  @@map("tiket_02")
-}
-
-model Tiket03 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_03_no_siri")
-  @@unique([noTiket, id], map: "tiket_03_no_tiket")
-  @@unique([kaunter, id], map: "tiket_03_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_03_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_03_cawangan")
-  @@map("tiket_03")
-}
-
-model Tiket04 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_04_no_siri")
-  @@unique([noTiket, id], map: "tiket_04_no_tiket")
-  @@unique([kaunter, id], map: "tiket_04_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_04_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_04_cawangan")
-  @@map("tiket_04")
-}
-
-model Tiket05 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_05_no_siri")
-  @@unique([noTiket, id], map: "tiket_05_no_tiket")
-  @@unique([kaunter, id], map: "tiket_05_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_05_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_05_cawangan")
-  @@map("tiket_05")
-}
-
-model Tiket06 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_06_no_siri")
-  @@unique([noTiket, id], map: "tiket_06_no_tiket")
-  @@unique([kaunter, id], map: "tiket_06_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_06_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_06_cawangan")
-  @@map("tiket_06")
-}
-
-model Tiket07 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              String?   @db.VarChar(11)
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         String?   @default("0") @map("transfer_from") @db.VarChar(11)
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_07_no_siri")
-  @@unique([noTiket, id], map: "tiket_07_no_tiket")
-  @@unique([kaunter, id], map: "tiket_07_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_07_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_07_cawangan")
-  @@map("tiket_07")
-}
-
-model Tiket08 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_08_no_siri")
-  @@unique([noTiket, id], map: "tiket_08_no_tiket")
-  @@unique([kaunter, id], map: "tiket_08_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_08_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_08_cawangan")
-  @@map("tiket_08")
-}
-
-model Tiket09 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_09_no_siri")
-  @@unique([noTiket, id], map: "tiket_09_no_tiket")
-  @@unique([kaunter, id], map: "tiket_09_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_09_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_09_cawangan")
-  @@map("tiket_09")
-}
-
-model Tiket10 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              String?   @db.VarChar(11)
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         String?   @default("0") @map("transfer_from") @db.VarChar(11)
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_10_no_siri")
-  @@unique([noTiket, id], map: "tiket_10_no_tiket")
-  @@unique([kaunter, id], map: "tiket_10_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_10_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_10_cawangan")
-  @@map("tiket_10")
-}
-
-model Tiket11 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_11_no_siri")
-  @@unique([noTiket, id], map: "tiket_11_no_tiket")
-  @@unique([kaunter, id], map: "tiket_11_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_11_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_11_cawangan")
-  @@map("tiket_11")
-}
-
-model Tiket12 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_12_no_siri")
-  @@unique([noTiket, id], map: "tiket_12_no_tiket")
-  @@unique([kaunter, id], map: "tiket_12_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_12_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_12_cawangan")
-  @@map("tiket_12")
-}
-
-model Tiket13 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_13_no_siri")
-  @@unique([noTiket, id], map: "tiket_13_no_tiket")
-  @@unique([kaunter, id], map: "tiket_13_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_13_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_13_cawangan")
-  @@map("tiket_13")
-}
-
-model Tiket14 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_14_no_siri")
-  @@unique([noTiket, id], map: "tiket_14_no_tiket")
-  @@unique([kaunter, id], map: "tiket_14_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_14_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_14_cawangan")
-  @@map("tiket_14")
-}
-
-model Tiket15 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_15_no_siri")
-  @@unique([noTiket, id], map: "tiket_15_no_tiket")
-  @@unique([kaunter, id], map: "tiket_15_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_15_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_15_cawangan")
-  @@map("tiket_15")
-}
-
-model Tiket16 {
-  id                   Int       @id @default(autoincrement())
-  transid              String?   @db.VarChar(50)
-  noTiket              Int?      @map("no_tiket")
-  noSiri               Int       @map("no_siri")
-  tarikh               DateTime?
-  kaunter              Int?
-  cawangan             String?   @db.VarChar(20)
-  kumpulanPerkhidmatan Int?      @map("kumpulan_perkhidmatan")
-  playerId             String?   @map("player_id") @db.VarChar(100)
-  createDate           DateTime? @map("create_date")
-  callDate             DateTime? @map("call_date")
-  transferDate         DateTime? @map("transfer_date")
-  endDate              DateTime? @map("end_date")
-  cancelDate           DateTime? @map("cancel_date")
-  activeDate           DateTime? @map("active_date")
-  requestBy            Int?      @default(1) @map("request_by")
-  catatan              String?   @db.Text
-  statusTiket          Int?      @default(0) @map("status_tiket")
-  batalOleh            Int       @default(0) @map("batal_oleh")
-  ip                   String?   @db.VarChar(100)
-  bilanganPanggil      Int?      @default(0) @map("bilangan_panggil")
-  transferFrom         Int?      @default(0) @map("transfer_from")
-  masaMenunggu         DateTime? @map("masa_menunggu") @db.Time
-  masaLayanan          DateTime? @map("masa_layanan") @db.Time
-  jumlahMasa           DateTime? @map("jumlah_masa") @db.Time
-  updateDate           DateTime  @default(now()) @map("update_date")
-  sesi                 Int
-  perkhidmatanKhas     String?   @map("perkhidmatan_khas") @db.VarChar(5)
-  jenisTiket           Int?      @map("jenis_tiket")
-  uuid                 String?   @db.VarChar(100)
-
-  @@unique([noSiri, id], map: "tiket_16_no_siri")
-  @@unique([noTiket, id], map: "tiket_16_no_tiket")
-  @@unique([kaunter, id], map: "tiket_16_kaunter")
-  @@unique([kumpulanPerkhidmatan, id], map: "tiket_16_kumpulan_perkhidmatan")
-  @@unique([cawangan, id], map: "tiket_16_cawangan")
-  @@map("tiket_16")
-}
-
-model TiketStat {
-  id                    Int       @id @default(autoincrement())
-  cawangan              String?   @db.VarChar(20)
-  tarikh                DateTime? @db.Date
-  bilTiket              Int?      @map("bil_tiket")
-  bilSelesai            Int?      @map("bil_selesai")
-  bilBatal              Int?      @map("bil_batal")
-  bilLain               Int?      @map("bil_lain")
-  batalCust             Int?      @map("batal_cust")
-  batalKaunter          Int?      @map("batal_kaunter")
-  purataMasaMenunggu    String?   @map("purata_masa_menunggu") @db.VarChar(30)
-  purataMasaLayanan     String?   @map("purata_masa_layanan") @db.VarChar(30)
-  masaMenungguTerlama   String?   @map("masa_menunggu_terlama") @db.VarChar(30)
-  masaLayananTerlama    String?   @map("masa_layanan_terlama") @db.VarChar(30)
-  jumlahMasaKeseluruhan String?   @map("jumlah_masa_keseluruhan") @db.VarChar(30)
-  masaAwal              DateTime? @map("masa_awal") @db.Time
-  masaAkhir             DateTime? @map("masa_akhir") @db.Time
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("tiket_stat")
-}
-
-model TiketStatCopy {
-  id                    Int       @id @default(autoincrement())
-  cawangan              String?   @db.VarChar(20)
-  tarikh                DateTime? @db.Date
-  bilTiket              Int?      @map("bil_tiket")
-  bilSelesai            Int?      @map("bil_selesai")
-  bilBatal              Int?      @map("bil_batal")
-  bilLain               Int?      @map("bil_lain")
-  batalCust             Int?      @map("batal_cust")
-  batalKaunter          Int?      @map("batal_kaunter")
-  purataMasaMenunggu    String?   @map("purata_masa_menunggu") @db.VarChar(30)
-  purataMasaLayanan     String?   @map("purata_masa_layanan") @db.VarChar(30)
-  masaMenungguTerlama   String?   @map("masa_menunggu_terlama") @db.VarChar(30)
-  masaLayananTerlama    String?   @map("masa_layanan_terlama") @db.VarChar(30)
-  jumlahMasaKeseluruhan String?   @map("jumlah_masa_keseluruhan") @db.VarChar(30)
-  masaAwal              DateTime? @map("masa_awal") @db.Time
-  masaAkhir             DateTime? @map("masa_akhir") @db.Time
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("tiket_stat_copy")
-}
-
-model TiketStatHour {
-  id                Int       @id @default(autoincrement())
-  cawangan          String?   @db.VarChar(20)
-  tarikh            DateTime? @db.Date
-  bilTiket          Int?      @map("bil_tiket")
-  bilTiketBatalCust Int?      @map("bil_tiket_batal_cust")
-  masa              String?   @db.VarChar(5)
-  jum               Int?
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("tiket_stat_hour")
-}
-
-model TiketStatUtc {
-  id                Int       @id @default(autoincrement())
-  cawangan          String?   @db.VarChar(20)
-  tarikh            DateTime? @db.Date
-  bilTiket          Int?      @map("bil_tiket")
-  bilTiketBatalCust Int?      @map("bil_tiket_batal_cust")
-  masa              String?   @db.VarChar(5)
-  jum               Int?
-
-  @@index([cawangan])
-  @@index([tarikh])
-  @@map("tiket_stat_utc")
-}
-
-model TrefBranch {
-  refbrBranchId      String?   @map("REFBR_BRANCH_ID") @db.Char(7)
-  refbrAgencyCode    String?   @map("REFBR_AGENCY_CODE") @db.Char(2)
-  refbrStateCode     String?   @map("REFBR_STATE_CODE") @db.Char(2)
-  refbrBranchCode    String?   @map("REFBR_BRANCH_CODE") @db.Char(2)
-  refbrUsageCode     String?   @map("REFBR_USAGE_CODE") @db.Char(1)
-  refbrName          String?   @map("REFBR_NAME") @db.Char(80)
-  refbrAddress1      String?   @map("REFBR_ADDRESS1") @db.Char(40)
-  refbrAddress2      String?   @map("REFBR_ADDRESS2") @db.Char(40)
-  refbrAddress3      String?   @map("REFBR_ADDRESS3") @db.Char(40)
-  refbrPostcode      String?   @map("REFBR_POSTCODE") @db.Char(5)
-  refbrCity          String?   @map("REFBR_CITY") @db.Char(4)
-  refbrState         String?   @map("REFBR_STATE") @db.Char(2)
-  refbrCountry       String?   @map("REFBR_COUNTRY") @db.Char(3)
-  refbrTelno         String?   @map("REFBR_TELNO") @db.Char(14)
-  refbrEmail         String?   @map("REFBR_EMAIL") @db.Char(100)
-  refbrContactPerson String?   @map("REFBR_CONTACT_PERSON") @db.Char(80)
-  refbrCreateBranch  String?   @map("REFBR_CREATE_BRANCH") @db.Char(7)
-  refbrUpdateBranch  String?   @map("REFBR_UPDATE_BRANCH") @db.Char(7)
-  refbrCreateUser    String?   @map("REFBR_CREATE_USER") @db.Char(12)
-  refbrCreateDate    DateTime? @map("REFBR_CREATE_DATE") @db.Date
-  refbrUpdateUser    String?   @map("REFBR_UPDATE_USER") @db.Char(12)
-  refbrUpdateDate    DateTime? @map("REFBR_UPDATE_DATE") @db.Date
-  refbrMasterBrId    String?   @map("REFBR_MASTER_BR_ID") @db.Char(7)
-  refbrEaShortCode   String?   @map("REFBR_EA_SHORT_CODE") @db.Char(3)
-  refbrFaxNo         String?   @map("REFBR_FAX_NO") @db.Char(14)
-  refbrDistrictCode  String?   @map("REFBR_DISTRICT_CODE") @db.Char(5)
-  refbrStatus        String?   @map("REFBR_STATUS") @db.Char(1)
-  refbrAddress4      String?   @map("REFBR_ADDRESS4") @db.Char(40)
-  refbrAddress5      String?   @map("REFBR_ADDRESS5") @db.Char(40)
-  refbrRemark        String?   @map("REFBR_REMARK") @db.Char(25)
-
-  @@map("tref_branch")
-  @@ignore // Table lacks a unique identifier/primary key
-}
+// -----------------------------------------------------------------------------
+// 3. PENGGUNA & KESELAMATAN
+// -----------------------------------------------------------------------------
 
 model User {
-  id          Int       @id @default(autoincrement())
-  nokp        String?   @db.VarChar(20)
-  nama        String?   @db.VarChar(200)
-  uname       String?   @db.VarChar(20)
-  pass        String?   @db.VarChar(200)
-  levelAkses  Int?      @map("level_akses")
-  idCawangan  String?   @map("id_cawangan") @db.VarChar(10)
-  lastLogin   DateTime? @map("last_login")
-  catatan     String?   @db.VarChar(20)
-  statusLogin Int?      @map("status_login")
+  id            String     @id @default(uuid())
+  tenantId      String?    @map("tenant_id")
+  tenant        Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branchId      String?    @map("branch_id")
+  branch        Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  username      String     @unique
+  email         String?    @unique
+  name          String
+  passwordHash  String     @map("password_hash") // Bcrypt hash
+  role          UserRole   @default(COUNTER_STAFF)
+  phone         String?
+  status        String     @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  lastLogin     DateTime?  @map("last_login")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
 
-  @@index([idCawangan])
+  counters      Counter[]  @relation("CounterStaff")
+  auditLogs     AuditLog[]
+
+  @@index([tenantId])
+  @@index([branchId])
   @@map("users")
 }
 
-model WaktuOperasi {
-  id          Int       @id @default(autoincrement())
-  cawangan    String?   @db.VarChar(20)
-  namaHari    String?   @map("nama_hari") @db.VarChar(3)
-  waktuMula   DateTime? @map("waktu_mula") @db.Time
-  waktuTamat  DateTime? @map("waktu_tamat") @db.Time
-  sesi        Int?
-  statusAktif Int       @default(1) @map("status_aktif")
-  createDate  DateTime? @map("create_date")
-  updateDate  DateTime? @map("update_date")
+// -----------------------------------------------------------------------------
+// 4. CAWANGAN & KONFIGURASI PREMIS
+// -----------------------------------------------------------------------------
 
-  @@index([cawangan])
-  @@index([namaHari])
-  @@map("waktu_operasi")
+model Branch {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String            // Cth: "Cawangan Shah Alam"
+  code        String            // Cth: "SA01"
+  address     String?
+  city        String?
+  state       String?
+  postcode    String?
+  phone       String?
+  latitude    Float?
+  longitude   Float?
+  qrRadiusMeters Int?           @default(500) @map("qr_radius_meters")
+  qrCodeUrl   String?           @map("qr_code_url")
+  settings    Json?             // Waktu rehat, hari operasi, teks notis
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  users        User[]
+  categories   ServiceCategory[]
+  counters     Counter[]
+  devices      Device[]
+  tickets      Ticket[]
+  schedules    StaffSchedule[]
+  appointments Appointment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("branches")
 }
 
-model Zon {
-  id       Int    @id @default(autoincrement())
-  cawangan String @db.VarChar(10)
-  zon      String @db.VarChar(25)
-  catatan  String @db.VarChar(50)
+model ServiceCategory {
+  id               String   @id @default(uuid())
+  branchId         String   @map("branch_id")
+  branch           Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name             String   // Cth: "Pembayaran & Zakat"
+  prefixCode       String   @map("prefix_code") // Cth: "A", "B", "K"
+  startNumber      Int      @default(1001) @map("start_number")
+  currentSeq       Int      @default(1000) @map("current_seq")
+  estimatedMinutes Int      @default(5) @map("estimated_minutes")
+  status           String   @default("ACTIVE") // ACTIVE, INACTIVE
+  sortOrder        Int      @default(1) @map("sort_order")
+  nextCategoryId   String?  @map("next_category_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  @@map("zon")
+  tickets          Ticket[]
+  appointments     Appointment[]
+
+  @@index([branchId])
+  @@map("service_categories")
 }
+
+model Counter {
+  id              String        @id @default(uuid())
+  branchId        String        @map("branch_id")
+  branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  counterNo       String        @map("counter_no") // Cth: "1", "2", "Bilik Rawatan 1"
+  name            String?       // Cth: "Kaunter Pembayaran 1"
+  zone            String?       // Cth: "Zon A", "Tingkat 1"
+  status          CounterStatus @default(OPEN)
+  assignedUserId  String?       @map("assigned_user_id")
+  assignedUser    User?         @relation("CounterStaff", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  currentTicketId String?       @map("current_ticket_id")
+  priorityOrder   String?       @map("priority_order") // Cth: "A,B,C"
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  schedules       StaffSchedule[]
+
+  @@index([branchId])
+  @@map("counters")
+}
+
+model StaffSchedule {
+  id          String    @id @default(uuid())
+  branchId    String    @map("branch_id")
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  counterId   String    @map("counter_id")
+  counter     Counter   @relation(fields: [counterId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  startDate   DateTime  @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([branchId])
+  @@index([counterId])
+  @@index([userId])
+  @@map("staff_schedules")
+}
+
+// -----------------------------------------------------------------------------
+// 5. PERANTI PAPARAN TV & KIOSK
+// -----------------------------------------------------------------------------
+
+model Device {
+  id             String    @id @default(uuid())
+  branchId       String?   @map("branch_id")
+  branch         Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  deviceName     String    @map("device_name") // Cth: "TV Ruang Menunggu Utama"
+  deviceUid      String    @unique @map("device_uid") // Hardware UUID / Browser Token
+  deviceType     String    @default("TV_DISPLAY") @map("device_type") // TV_DISPLAY, KIOSK_PRINTER, TABLET
+  pairingCode    String?   @map("pairing_code") // Kod 6-digit sementara
+  pairingExpires DateTime? @map("pairing_expires")
+  isPaired       Boolean   @default(false) @map("is_paired")
+  appVersion     String?   @map("app_version")
+  ipAddress      String?   @map("ip_address")
+  lastHeartbeat  DateTime  @default(now()) @map("last_heartbeat")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("devices")
+}
+
+// -----------------------------------------------------------------------------
+// 6. REKOD TIKET GILIRAN (TERPADU & BERINDEKS)
+// -----------------------------------------------------------------------------
+
+model Ticket {
+  id                     String          @id @default(uuid())
+  tenantId               String          @map("tenant_id")
+  branchId               String          @map("branch_id")
+  branch                 Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  categoryId             String          @map("category_id")
+  category               ServiceCategory @relation(fields: [categoryId], references: [id])
+  ticketNo               String          @map("ticket_no") // Cth: "A1002"
+  seqNumber              Int             @map("seq_number") // 1002
+  phoneNo                String?         @map("phone_no") // Untuk notifikasi WhatsApp/SMS
+  customerName           String?         @map("customer_name")
+  status                 TicketStatus    @default(WAITING)
+  counterNo              String?         @map("counter_no")
+  calledByUserId         String?         @map("called_by_user_id")
+  callCount              Int             @default(0) @map("call_count")
+  requestType            String          @default("QR_WEB") @map("request_type") // QR_WEB, KIOSK, APP, MANUAL
+  notes                  String?         @db.Text
+  calledAt               DateTime?       @map("called_at")
+  servedAt               DateTime?       @map("served_at")
+  completedAt            DateTime?       @map("completed_at")
+  cancelledAt            DateTime?       @map("cancelled_at")
+  waitingDurationSeconds Int?            @map("waiting_duration_seconds")
+  servingDurationSeconds Int?            @map("serving_duration_seconds")
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+
+  feedback               Feedback?
+
+  @@index([tenantId, branchId, createdAt])
+  @@index([branchId, status])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+// -----------------------------------------------------------------------------
+// 8. TEMUJANJI MAYA (APPOINTMENTS)
+// -----------------------------------------------------------------------------
+
+model Appointment {
+  id              String          @id @default(uuid())
+  tenantId        String          @map("tenant_id")
+  branchId        String          @map("branch_id")
+  branch          Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  categoryId      String          @map("category_id")
+  category        ServiceCategory @relation(fields: [categoryId], references: [id])
+  appointmentDate DateTime        @map("appointment_date") @db.Date
+  timeSlot        String          @map("time_slot") // Cth: "10:30"
+  customerName    String          @map("customer_name")
+  customerEmail   String?         @map("customer_email")
+  customerPhone   String          @map("customer_phone")
+  status          String          @default("CONFIRMED") // CONFIRMED, CHECKED_IN, COMPLETED, CANCELLED
+  ticketId        String?         @map("ticket_id")
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([branchId, appointmentDate])
+  @@index([customerPhone])
+  @@map("appointments")
+}
+
+// -----------------------------------------------------------------------------
+// 9. AUDIT LOG & KESELAMATAN
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String?  @map("tenant_id")
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   // Cth: "USER_LOGIN", "CALL_NEXT", "PAIR_DEVICE"
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  status     String   @default("SUCCESS") // SUCCESS, FAILED
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+// -----------------------------------------------------------------------------
+// 10. MAKLUM BALAS & PENARAFAN KEPUASAN (CSAT)
+// -----------------------------------------------------------------------------
+
+model Feedback {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  branchId     String   @map("branch_id")
+  ticketId     String   @unique @map("ticket_id")
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  counterNo    String?  @map("counter_no")
+  staffUserId  String?  @map("staff_user_id")
+  rating       Int      @default(5) // 1 hingga 5 Bintang
+  tags         Json?    // Cth: ["Layanan Pantas", "Staf Mesra"]
+  comment      String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, branchId])
+  @@index([staffUserId])
+  @@index([rating])
+  @@map("feedbacks")
+}
+
+// -----------------------------------------------------------------------------
+// 11. TRANSAKSI PEMBAYARAN & INVOIS LANGGANAN SAAS (FASA 17)
+// -----------------------------------------------------------------------------
+
+model PaymentTransaction {
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptionId  String?       @map("subscription_id")
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoiceNo       String        @unique @map("invoice_no") // Cth: "INV-2026-0001"
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("MYR")
+  planType        String        @map("plan_type") // STARTER, PRO, ENTERPRISE
+  billingCycle    String        @default("MONTHLY") @map("billing_cycle") // MONTHLY, YEARLY
+  paymentMethod   String        @default("FPX") @map("payment_method") // FPX, CARD, DUITNOW_QR, SANDBOX
+  gatewayProvider String        @default("SIMULATOR") @map("gateway_provider") // TOYYIBPAY, BILLPLZ, STRIPE, SIMULATOR
+  gatewayRef      String?       @map("gateway_ref")
+  billCode        String?       @map("bill_code")
+  status          PaymentStatus @default(PENDING)
+  receiptUrl      String?       @map("receipt_url")
+  paidAt          DateTime?     @map("paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([tenantId, status])
+  @@map("payment_transactions")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+
+

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type BranchSettings } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "Cawangan tidak ditemui." }, { status: 404 });
       }
 
-      const currentSettings = (branch.settings as any) || {};
+      const currentSettings = readJsonObject<BranchSettings>(branch.settings);
       const updatedSettings = { ...currentSettings, runningText };
 
       await prisma.branch.update({
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "Cawangan tidak ditemui." }, { status: 404 });
       }
 
-      const currentSettings = (branch.settings as any) || {};
+      const currentSettings = readJsonObject<BranchSettings>(branch.settings);
       const updatedSettings = { ...currentSettings, kioskPaused: !!kioskPaused };
 
       await prisma.branch.update({
@@ -102,10 +104,10 @@ export async function POST(req: NextRequest) {
       { success: false, message: "Tindakan tidak sah." },
       { status: 400 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Manager Command Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa memproses arahan pengurus." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa memproses arahan pengurus.") },
       { status: 500 }
     );
   }

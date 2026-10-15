@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
 import { calculateTenantHealth } from "@/lib/tenant-health";
+import { daysUntil } from "@/lib/date";
 import Link from "next/link";
 
 interface BranchItem {
@@ -16,11 +17,9 @@ interface BranchItem {
 
 interface UserItem {
   id: string;
-  name: string | null;
+  name: string;
   email: string | null;
-  username: string;
   role: string;
-  lastLogin: string | null;
 }
 
 interface SubscriptionInfo {
@@ -89,9 +88,33 @@ interface AuditLogItem {
   action: string;
   tenantName: string;
   status: string;
-  details: any;
+  details: unknown;
   ipAddress: string | null;
   createdAt: string;
+}
+
+/** Respons POST /api/superadmin/broadcast */
+interface BroadcastResult {
+  success: boolean;
+  message?: string;
+  sentCount: number;
+  recipients?: { tenantName: string; adminName: string; contact: string }[];
+}
+
+/** Medan `diagnostics` daripada GET /api/superadmin/diagnostics */
+interface DiagnosticsData {
+  database: { engine: string; version: string; size: string; latencyMs: number; status: string };
+  counts: {
+    tenants: number;
+    branches: number;
+    counters: number;
+    tickets: number;
+    users: number;
+    devices: number;
+    transactions: number;
+    auditLogs: number;
+  };
+  server: { uptime: number; nodeVersion: string; memoryUsageMb: number; environment: string };
 }
 
 interface PlatformSettings {
@@ -136,6 +159,8 @@ export default function SuperadminClient({
   const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLogItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  // Masa semasa diambil sekali semasa pemasangan supaya render kekal tulen
+  const [renderedAt] = useState(() => Date.now());
 
   // Broadcast Form State
   const [broadcastData, setBroadcastData] = useState({
@@ -145,10 +170,10 @@ export default function SuperadminClient({
     channel: "WHATSAPP",
   });
   const [broadcasting, setBroadcasting] = useState(false);
-  const [broadcastResult, setBroadcastResult] = useState<any>(null);
+  const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
 
   // Diagnostics State
-  const [diagnosticsData, setDiagnosticsData] = useState<any>(null);
+  const [diagnosticsData, setDiagnosticsData] = useState<DiagnosticsData | null>(null);
   const [fetchingDiagnostics, setFetchingDiagnostics] = useState(false);
   const [downloadingBackup, setDownloadingBackup] = useState(false);
 
@@ -167,6 +192,8 @@ export default function SuperadminClient({
       });
       const data = await res.json();
       if (data.success) {
+        // Muat semula penuh diperlukan supaya kuki penyamaran dibaca semula oleh komponen pelayan
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/dashboard";
       } else {
         setStatusMessage(data.message || "Gagal memulakan penyamaran.");
@@ -315,9 +342,7 @@ export default function SuperadminClient({
 
   // Filtered Tenants with Health Scoring
   const filteredTenants = tenants.filter((item) => {
-    const daysUntilExpiry = item.subscription?.endDate
-      ? Math.ceil((new Date(item.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : null;
+    const daysUntilExpiry = daysUntil(item.subscription?.endDate, renderedAt);
 
     const health = calculateTenantHealth({
       ticketCountLast7Days: 25, // Estimation for table
@@ -572,9 +597,7 @@ export default function SuperadminClient({
                   const maxB = item.subscription?.maxBranches || 1;
                   const branchPercent = Math.min(100, Math.round((item.branchCount / maxB) * 100));
 
-                  const daysUntilExpiry = item.subscription?.endDate
-                    ? Math.ceil((new Date(item.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                    : null;
+                  const daysUntilExpiry = daysUntil(item.subscription?.endDate, renderedAt);
 
                   const health = calculateTenantHealth({
                     ticketCountLast7Days: 25,
@@ -959,7 +982,7 @@ export default function SuperadminClient({
               </div>
 
               <div className="col-span-1 sm:col-span-3 p-4 bg-slate-950 text-emerald-400 rounded-2xl font-mono text-xs overflow-x-auto">
-                <p className="text-gray-400 mb-2">// Ringkasan Baris Jadual Pangkalan Data:</p>
+                <p className="text-gray-400 mb-2">{"// Ringkasan Baris Jadual Pangkalan Data:"}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>tenants: {diagnosticsData.counts.tenants}</div>
                   <div>branches: {diagnosticsData.counts.branches}</div>

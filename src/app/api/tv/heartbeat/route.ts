@@ -17,7 +17,6 @@ interface TvRecord {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var globalTvStore: Map<string, TvRecord> | undefined;
 }
 
@@ -136,7 +135,7 @@ export async function POST(req: NextRequest) {
       serverTime: now.toISOString(),
       command: pendingCommand || "NONE",
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Ralat memproses denyutan nadi TV" },
       { status: 500 }

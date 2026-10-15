@@ -1,3 +1,4 @@
+import type { PlanType } from "@prisma/client";
 import { prisma } from "./prisma";
 import { invalidateSubscriptionCache } from "./subscription";
 import { isToyyibPayConfigured, verifyToyyibPayPayment } from "./payments/toyyibpay";
@@ -141,7 +142,7 @@ export async function handleSuccessfulPayment(params: {
       const updatedSub = await tx.subscription.update({
         where: { id: existingSub.id },
         data: {
-          planType: transaction.planType as any,
+          planType: transaction.planType as PlanType,
           status: "ACTIVE",
           startDate: now,
           endDate,
@@ -158,7 +159,7 @@ export async function handleSuccessfulPayment(params: {
       const newSub = await tx.subscription.create({
         data: {
           tenantId: transaction.tenantId,
-          planType: transaction.planType as any,
+          planType: transaction.planType as PlanType,
           status: "ACTIVE",
           startDate: now,
           endDate,
@@ -183,7 +184,7 @@ export async function handleSuccessfulPayment(params: {
     await tx.tenant.update({
       where: { id: transaction.tenantId },
       data: {
-        planType: transaction.planType as any,
+        planType: transaction.planType as PlanType,
         status: "ACTIVE",
       },
     });

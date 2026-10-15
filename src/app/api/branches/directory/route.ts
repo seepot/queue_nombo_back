@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type BranchSettings } from "@/lib/settings";
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,16 +9,13 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("q") || "";
     const tenantSlug = searchParams.get("tenant") || "";
 
-    const whereClause: any = {
-      status: "ACTIVE",
+    // Nota: model Branch tiada medan `status`; hanya tenant yang ditapis mengikut status.
+    const whereClause: Prisma.BranchWhereInput = {
       tenant: {
         status: "ACTIVE",
+        ...(tenantSlug ? { slug: tenantSlug } : {}),
       },
     };
-
-    if (tenantSlug) {
-      whereClause.tenant.slug = tenantSlug;
-    }
 
     if (search) {
       whereClause.OR = [
@@ -77,7 +76,7 @@ export async function GET(req: NextRequest) {
           phone: b.phone,
           latitude: b.latitude,
           longitude: b.longitude,
-          operatingHours: (b.settings as any)?.operatingHours || "08:30 - 17:00",
+          operatingHours: readJsonObject<BranchSettings>(b.settings).operatingHours || "08:30 - 17:00",
           tenant: {
             id: b.tenant.id,
             name: b.tenant.name,

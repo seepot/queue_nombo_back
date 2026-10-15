@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
 import Link from "next/link";
@@ -83,11 +83,12 @@ export default function BillingClient({
     }
   };
 
-  useEffect(() => {
-    if (activeTab === "INVOICES") {
-      fetchInvoices();
-    }
-  }, [activeTab]);
+  // Invois dimuatkan apabila tab Invois dibuka (pengendali acara, bukan setState dalam effect)
+  const openInvoicesTab = () => {
+    if (activeTab === "INVOICES") return;
+    setActiveTab("INVOICES");
+    fetchInvoices();
+  };
 
   const handleOpenCheckoutModal = (planType: string) => {
     setSelectedPlanForModal(planType);
@@ -226,7 +227,7 @@ export default function BillingClient({
             {language === "en" ? "Pricing Plans" : "Pilihan Pelan"}
           </button>
           <button
-            onClick={() => setActiveTab("INVOICES")}
+            onClick={openInvoicesTab}
             className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === "INVOICES" ? "bg-white text-blue-600 shadow-xs" : "text-gray-600 hover:text-gray-900"
             }`}

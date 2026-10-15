@@ -1,3 +1,5 @@
+import { getErrorMessage } from "./errors";
+
 /**
  * QueNombo Offline Sync Engine (Fasa 19)
  * Manages local edge queue buffering and automatic batch reconciliation with Cloud.
@@ -135,11 +137,11 @@ export async function syncOfflineTicketsToCloud(): Promise<{
         message: data.message || "Gagal menyegerakkan data luar talian.",
       };
     }
-  } catch (err: any) {
+  } catch (err) {
     return {
       success: false,
       syncedCount: 0,
-      message: err.message || "Ralat rangkaian semasa penyegerakan.",
+      message: getErrorMessage(err, "Ralat rangkaian semasa penyegerakan."),
     };
   }
 }

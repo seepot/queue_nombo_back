@@ -92,6 +92,7 @@ export default function PrintSlipClient({ ticket }: { ticket: TicketPrintData })
         {/* QR Code Tracker */}
         <div className="py-1">
           {qrDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL kod QR dijana di klien; next/image tidak sesuai
             <img src={qrDataUrl} alt="QR Code" className="w-28 h-28 mx-auto" />
           ) : (
             <div className="w-28 h-28 bg-gray-100 mx-auto flex items-center justify-center text-[10px]">

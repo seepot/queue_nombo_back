@@ -1,7 +1,21 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
+import { readJsonObject, type BranchSettings } from "@/lib/settings";
 import ManagerMobileClient from "./ManagerMobileClient";
+
+const branchInclude = {
+  counters: {
+    include: {
+      assignedUser: true,
+    },
+  },
+  categories: true,
+  tenant: true,
+} satisfies Prisma.BranchInclude;
+
+type BranchWithRelations = Prisma.BranchGetPayload<{ include: typeof branchInclude }>;
 
 export const metadata = {
   title: "Pusat Kawalan Mudah Alih Pengurus | QueNombo SaaS",
@@ -19,32 +33,16 @@ export default async function ManagerMobilePage() {
   const tenantId = user.tenantId;
 
   // Dapatkan senarai cawangan
-  let branches: any[] = [];
+  let branches: BranchWithRelations[] = [];
   if (user.role === "SUPERADMIN") {
     branches = await prisma.branch.findMany({
-      include: {
-        counters: {
-          include: {
-            assignedUser: true,
-          },
-        },
-        categories: true,
-        tenant: true,
-      },
+      include: branchInclude,
       take: 10,
     });
   } else if (tenantId) {
     branches = await prisma.branch.findMany({
       where: { tenantId },
-      include: {
-        counters: {
-          include: {
-            assignedUser: true,
-          },
-        },
-        categories: true,
-        tenant: true,
-      },
+      include: branchInclude,
     });
   }
 
@@ -75,25 +73,28 @@ export default async function ManagerMobilePage() {
     }),
   ]);
 
-  const rawSettings = (activeBranch.settings as any) || {};
+  const rawSettings = readJsonObject<BranchSettings>(activeBranch.settings);
 
   return (
     <ManagerMobileClient
-      branches={branches.map((b) => ({
-        id: b.id,
-        name: b.name,
-        code: b.code,
-        tenantName: b.tenant.name,
-        runningText: ((b.settings as any) || {}).runningText || "",
-        kioskPaused: ((b.settings as any) || {}).kioskPaused || false,
-        counters: b.counters.map((c: any) => ({
-          id: c.id,
-          counterNo: c.counterNo,
-          name: c.name || `Kaunter ${c.counterNo}`,
-          status: c.status,
-          staffName: c.assignedUser?.name || null,
-        })),
-      }))}
+      branches={branches.map((b) => {
+        const settings = readJsonObject<BranchSettings>(b.settings);
+        return {
+          id: b.id,
+          name: b.name,
+          code: b.code,
+          tenantName: b.tenant.name,
+          runningText: settings.runningText || "",
+          kioskPaused: settings.kioskPaused || false,
+          counters: b.counters.map((c) => ({
+            id: c.id,
+            counterNo: c.counterNo,
+            name: c.name || `Kaunter ${c.counterNo}`,
+            status: c.status,
+            staffName: c.assignedUser?.name || null,
+          })),
+        };
+      })}
       initialActiveBranchId={activeBranch.id}
       initialMetrics={{
         waitingCount,

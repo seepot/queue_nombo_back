@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -44,11 +45,11 @@ export async function GET() {
     let dbSize = "18.4 MB";
     let pgVersion = "PostgreSQL 16.1 (Debian)";
     try {
-      const sizeResult: any = await prisma.$queryRaw`SELECT pg_size_pretty(pg_database_size(current_database())) as size;`;
+      const sizeResult = await prisma.$queryRaw<{ size: string }[]>`SELECT pg_size_pretty(pg_database_size(current_database())) as size;`;
       if (sizeResult && sizeResult[0]?.size) {
         dbSize = sizeResult[0].size;
       }
-      const versionResult: any = await prisma.$queryRaw`SELECT version();`;
+      const versionResult = await prisma.$queryRaw<{ version: string }[]>`SELECT version();`;
       if (versionResult && versionResult[0]?.version) {
         pgVersion = versionResult[0].version.split(" on ")[0];
       }
@@ -84,10 +85,10 @@ export async function GET() {
         },
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Diagnostics GET Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa mengambil diagnostik." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa mengambil diagnostik.") },
       { status: 500 }
     );
   }
@@ -140,10 +141,10 @@ export async function POST() {
       message: `Snapshot sandaran pangkalan data berjaya dijana (${tenants.length} organisasi)!`,
       snapshot,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Diagnostics POST Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa menjana sandaran." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa menjana sandaran.") },
       { status: 500 }
     );
   }

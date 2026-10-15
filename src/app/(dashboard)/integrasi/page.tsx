@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type TenantSettings } from "@/lib/settings";
 import IntegrationClient from "./IntegrationClient";
 
 export const metadata = {
@@ -42,7 +43,7 @@ export default async function IntegrationPage() {
   }
 
   const subscription = tenant?.subscriptions[0];
-  const settings = (tenant?.settings as any) || {};
+  const settings = readJsonObject<TenantSettings>(tenant?.settings);
 
   return (
     <IntegrationClient

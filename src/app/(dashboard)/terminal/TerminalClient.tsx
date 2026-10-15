@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
-import { announceQueueNumber, playAirportChime } from "@/lib/voice-announcer";
+import { announceQueueNumber } from "@/lib/voice-announcer";
 
 interface CurrentServing {
   id: string;
@@ -49,9 +49,9 @@ export default function TerminalClient({
   const router = useRouter();
   const { language, t } = useLanguage();
   const [currentServing, setCurrentServing] = useState<CurrentServing | null>(initialServing);
-  const [waitingList, setWaitingList] = useState<WaitingTicket[]>(initialWaiting);
+  const [waitingList] = useState<WaitingTicket[]>(initialWaiting);
   const [counterNo, setCounterNo] = useState(initialCounterNo || "1");
-  const [counterId, setCounterId] = useState(initialCounterId || "");
+  const [counterId] = useState(initialCounterId || "");
   const [loading, setLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -60,16 +60,12 @@ export default function TerminalClient({
   const [statusMessage, setStatusMessage] = useState("");
   const [voiceMode, setVoiceMode] = useState<"ms" | "en" | "bilingual">("ms");
 
-  // Live Timer untuk masa layanan tiket semasa
+  // Live Timer untuk masa layanan tiket semasa (pemasa diset semula di pengendali apabila tiada tiket)
   useEffect(() => {
-    let interval: any;
-    if (currentServing) {
-      interval = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setElapsedSeconds(0);
-    }
+    if (!currentServing) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(interval);
   }, [currentServing]);
 
@@ -136,6 +132,7 @@ export default function TerminalClient({
           } else {
             setStatusMessage(language === "en" ? "No customers waiting in queue." : "Tiada pelanggan dalam barisan menunggu.");
             setCurrentServing(null);
+            setElapsedSeconds(0);
           }
         } else if (action === "RECALL") {
           if (currentServing) {

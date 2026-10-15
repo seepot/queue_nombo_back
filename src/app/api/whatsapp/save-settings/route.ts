@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type TenantSettings } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const currentSettings = (tenant.settings as any) || {};
+    const currentSettings = readJsonObject<TenantSettings>(tenant.settings);
 
     const updatedSettings = {
       ...currentSettings,

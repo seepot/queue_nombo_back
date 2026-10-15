@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
+import type { OfflineTicketPayload } from "@/lib/offline-sync";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,9 +24,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { tickets } = body;
+    const tickets: OfflineTicketPayload[] = Array.isArray(body?.tickets) ? body.tickets : [];
 
-    if (!Array.isArray(tickets) || tickets.length === 0) {
+    if (tickets.length === 0) {
       return NextResponse.json(
         { success: false, message: "Tiada data tiket dibekalkan untuk penyegerakan." },
         { status: 400 }
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
             data: {
               tenantId: firstBranch.tenantId,
               action: "OFFLINE_BATCH_SYNC",
-              details: { syncedCount: syncedIds.length, tickets: tickets.map((t: any) => t.ticketNo) },
+              details: { syncedCount: syncedIds.length, tickets: tickets.map((t) => t.ticketNo) },
               status: "SUCCESS",
             },
           });
@@ -117,10 +119,10 @@ export async function POST(req: NextRequest) {
       message: `${syncedIds.length} rekod tiket luar talian berjaya disegerakkan ke pangkalan data awan.`,
       syncedIds,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Offline Batch Sync Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat pelayan semasa penyegerakan luar talian." },
+      { success: false, message: getErrorMessage(error, "Ralat pelayan semasa penyegerakan luar talian.") },
       { status: 500 }
     );
   }

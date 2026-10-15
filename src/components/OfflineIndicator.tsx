@@ -1,22 +1,35 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { getOfflineBuffer, syncOfflineTicketsToCloud } from "@/lib/offline-sync";
 
+// Status talian pelayar sebagai stor luaran (acara online/offline)
+const subscribeOnlineStatus = (onChange: () => void) => {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+};
+const getOnlineSnapshot = () => (typeof navigator !== "undefined" ? navigator.onLine : true);
+const getServerOnlineSnapshot = () => true;
+
+// Bilangan tiket luar talian dalam penimbal setempat, disemak setiap 3 saat
+const subscribePendingCount = (onChange: () => void) => {
+  const interval = setInterval(onChange, 3000);
+  return () => clearInterval(interval);
+};
+const getPendingCountSnapshot = () => getOfflineBuffer().length;
+const getServerPendingCountSnapshot = () => 0;
+
 export default function OfflineIndicator() {
   const { language } = useLanguage();
-  const [isOnline, setIsOnline] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
+  const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getServerOnlineSnapshot);
+  const pendingCount = useSyncExternalStore(subscribePendingCount, getPendingCountSnapshot, getServerPendingCountSnapshot);
   const [syncing, setSyncing] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
-
-  const updateStatus = () => {
-    const online = typeof navigator !== "undefined" ? navigator.onLine : true;
-    setIsOnline(online);
-    const buffer = getOfflineBuffer();
-    setPendingCount(buffer.length);
-  };
 
   const handleManualSync = async () => {
     if (!isOnline || pendingCount === 0 || syncing) return;
@@ -31,19 +44,15 @@ export default function OfflineIndicator() {
           ? `✓ ${res.syncedCount} offline tickets synced to cloud successfully!`
           : `✓ ${res.syncedCount} tiket luar talian berjaya disegerakkan ke awan!`
       );
-      setPendingCount(0);
       setTimeout(() => {
         setSyncSuccessMsg(null);
       }, 5000);
     }
   };
 
+  // Segerak automatik apabila talian pulih
   useEffect(() => {
-    updateStatus();
-
     const handleOnline = async () => {
-      setIsOnline(true);
-      // Auto-trigger sync on reconnect
       const buffer = getOfflineBuffer();
       if (buffer.length > 0) {
         setSyncing(true);
@@ -55,7 +64,6 @@ export default function OfflineIndicator() {
               ? `✓ Online connection restored! ${res.syncedCount} offline records synced to cloud.`
               : `✓ Talian internet pulih! ${res.syncedCount} rekod luar talian berjaya disegerakkan ke awan.`
           );
-          setPendingCount(0);
           setTimeout(() => {
             setSyncSuccessMsg(null);
           }, 5000);
@@ -63,19 +71,9 @@ export default function OfflineIndicator() {
       }
     };
 
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
     window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    const interval = setInterval(updateStatus, 3000);
-
     return () => {
       window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      clearInterval(interval);
     };
   }, [language]);
 

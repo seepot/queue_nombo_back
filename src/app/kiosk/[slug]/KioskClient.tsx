@@ -38,24 +38,21 @@ export default function KioskClient({ branch }: { branch: BranchKioskData }) {
   } | null>(null);
   const [autoResetTimer, setAutoResetTimer] = useState<number>(6);
 
-  // Auto reset screen countdown when ticket is issued
+  // Auto reset screen countdown when ticket is issued (kiraan diset semula di tempat tiket dikeluarkan)
   useEffect(() => {
-    let interval: any;
-    if (issuedTicket) {
-      setAutoResetTimer(6);
-      interval = setInterval(() => {
-        setAutoResetTimer((prev) => {
-          if (prev <= 1) {
-            setIssuedTicket(null);
-            setSelectedCat(null);
-            setPhoneNo("");
-            setShowNumpad(false);
-            return 6;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (!issuedTicket) return;
+    const interval = setInterval(() => {
+      setAutoResetTimer((prev) => {
+        if (prev <= 1) {
+          setIssuedTicket(null);
+          setSelectedCat(null);
+          setPhoneNo("");
+          setShowNumpad(false);
+          return 6;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(interval);
   }, [issuedTicket]);
 
@@ -92,6 +89,7 @@ export default function KioskClient({ branch }: { branch: BranchKioskData }) {
 
       const data = await res.json();
       if (data.success && data.ticket) {
+        setAutoResetTimer(6);
         setIssuedTicket({
           id: data.ticket.id,
           ticketNo: data.ticket.ticketNo,
@@ -123,6 +121,7 @@ export default function KioskClient({ branch }: { branch: BranchKioskData }) {
         phoneNo: phoneNo.trim() || undefined,
       });
 
+      setAutoResetTimer(6);
       setIssuedTicket({
         id: offlineTicket.id,
         ticketNo: offlineTicket.ticketNo,

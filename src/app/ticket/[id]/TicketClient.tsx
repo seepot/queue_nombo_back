@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 
 interface TicketData {
@@ -22,7 +22,6 @@ export default function TicketClient({ initialTicket }: { initialTicket: TicketD
   const { language, setLanguage, t } = useLanguage();
   const [ticket, setTicket] = useState<TicketData>(initialTicket);
   const [lastStatus, setLastStatus] = useState(initialTicket.status);
-  const audioContextRef = useRef<AudioContext | null>(null);
 
   // CSAT Rating States
   const [rating, setRating] = useState<number>(5);
@@ -43,7 +42,8 @@ export default function TicketClient({ initialTicket }: { initialTicket: TicketD
   // Amaran bunyi pelayar apabila dipanggil
   const playAlertSound = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -139,8 +139,6 @@ export default function TicketClient({ initialTicket }: { initialTicket: TicketD
 
   const isCalling = ticket.status === "CALLING";
   const isCompleted = ticket.status === "COMPLETED";
-
-  const EMOJIS = ["😡", "😕", "😐", "😊", "🤩"];
 
   return (
     <div

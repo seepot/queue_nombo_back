@@ -1,4 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
+
+/** Medan respons Nominatim yang digunakan. */
+interface NominatimResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+  class: string;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,9 +38,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const data = await res.json();
+    const data: NominatimResult[] = await res.json();
 
-    const results = data.map((item: any) => ({
+    const results = data.map((item) => ({
       displayName: item.display_name,
       lat: parseFloat(item.lat),
       lon: parseFloat(item.lon),
@@ -42,10 +52,10 @@ export async function GET(req: NextRequest) {
       success: true,
       results,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Geocoding Search Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat pelayan carian lokasi." },
+      { success: false, message: getErrorMessage(error, "Ralat pelayan carian lokasi.") },
       { status: 500 }
     );
   }

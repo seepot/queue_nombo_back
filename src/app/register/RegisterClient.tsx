@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getErrorMessage } from "@/lib/errors";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -108,7 +109,7 @@ export default function RegisterClient() {
         }
       }
     } catch (err) {
-      setErrorMessage((err as Error).message || (language === "en" ? "Network connection error." : "Ralat rangkaian semasa pendaftaran."));
+      setErrorMessage(getErrorMessage(err, language === "en" ? "Network connection error." : "Ralat rangkaian semasa pendaftaran."));
     } finally {
       setLoading(false);
     }

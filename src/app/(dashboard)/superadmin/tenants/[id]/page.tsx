@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { daysAgo, daysUntil } from "@/lib/date";
+import { readJsonObject, type TenantSettings } from "@/lib/settings";
 import TenantProfileClient from "./TenantProfileClient";
 
 export const metadata = {
@@ -70,17 +72,15 @@ export default async function TenantProfilePage({
     where: { branch: { tenantId: tenant.id } },
   });
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = daysAgo(7);
   const ticketCountLast7Days = await prisma.ticket.count({
     where: { branch: { tenantId: tenant.id }, createdAt: { gte: sevenDaysAgo } },
   });
 
   const sub = tenant.subscriptions[0];
-  const settings = (tenant.settings as any) || {};
+  const settings = readJsonObject<TenantSettings>(tenant.settings);
 
-  const daysUntilExpiry = sub?.endDate
-    ? Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
+  const daysUntilExpiry = daysUntil(sub?.endDate);
 
   const activeStaffWithRecentLogin = tenant.users.filter(
     (u) => u.lastLogin && new Date(u.lastLogin) >= sevenDaysAgo
@@ -150,7 +150,7 @@ export default async function TenantProfilePage({
         isPaired: d.isPaired,
       })),
     })),
-    users: tenant.users.map((u: any) => ({
+    users: tenant.users.map((u) => ({
       id: u.id,
       name: u.name,
       username: u.username,
@@ -159,7 +159,7 @@ export default async function TenantProfilePage({
       role: u.role,
       status: u.status,
       branchName: u.branch ? `${u.branch.name} [${u.branch.code}]` : null,
-      assignedCounters: u.counters?.map((c: any) => c.name || `Kaunter ${c.counterNo}`) || [],
+      assignedCounters: u.counters?.map((c) => c.name || `Kaunter ${c.counterNo}`) || [],
       lastLogin: u.lastLogin ? u.lastLogin.toISOString() : null,
       createdAt: u.createdAt.toISOString(),
     })),

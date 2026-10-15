@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readJsonObject, type BranchSettings } from "@/lib/settings";
 import bcrypt from "bcryptjs";
 import { checkTenantQuota } from "@/lib/quota";
 import { assertTenantOperational, subscriptionBlockedResponse } from "@/lib/subscription";
@@ -49,10 +51,10 @@ export async function GET() {
       maxBranches,
       usedBranches: branches.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Branches GET Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat mengambil senarai cawangan." },
+      { success: false, message: getErrorMessage(error, "Ralat mengambil senarai cawangan.") },
       { status: 500 }
     );
   }
@@ -178,10 +180,10 @@ export async function POST(req: NextRequest) {
       message: `Cawangan '${newBranch.name}' berjaya dicipta bersama kaunter & kategori asas!`,
       branch: newBranch,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Branches POST Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa mencipta cawangan." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa mencipta cawangan.") },
       { status: 500 }
     );
   }
@@ -506,7 +508,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // D. KEMAS KINI PROFIL UTAMA CAWANGAN
-    const currentSettings = (branch.settings as any) || {};
+    const currentSettings = readJsonObject<BranchSettings>(branch.settings);
     const updatedSettings = {
       ...currentSettings,
       ...(operatingHours ? { operatingHours } : {}),
@@ -540,10 +542,10 @@ export async function PATCH(req: NextRequest) {
       message: `Tetapan cawangan '${updated.name}' berjaya dikemas kini!`,
       branch: updated,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Branches PATCH Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message || "Ralat semasa mengemas kini cawangan." },
+      { success: false, message: getErrorMessage(error, "Ralat semasa mengemas kini cawangan.") },
       { status: 500 }
     );
   }

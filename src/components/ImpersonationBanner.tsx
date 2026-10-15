@@ -14,22 +14,12 @@ export default function ImpersonationBanner() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const checkImpersonation = async () => {
-    try {
-      const res = await fetch("/api/superadmin/impersonate");
-      const data = await res.json();
-      if (data.isImpersonating) {
-        setImpersonating(data);
-      } else {
-        setImpersonating(null);
-      }
-    } catch {
-      setImpersonating(null);
-    }
-  };
-
+  // Semak status penyamaran setiap kali laluan bertukar (setState hanya selepas respons tiba)
   useEffect(() => {
-    checkImpersonation();
+    fetch("/api/superadmin/impersonate")
+      .then((res) => res.json())
+      .then((data) => setImpersonating(data.isImpersonating ? data : null))
+      .catch(() => setImpersonating(null));
   }, [pathname]);
 
   const handleStopImpersonation = async () => {
@@ -37,6 +27,8 @@ export default function ImpersonationBanner() {
     try {
       await fetch("/api/superadmin/impersonate", { method: "DELETE" });
       setImpersonating(null);
+      // Muat semula penuh diperlukan supaya kuki penyamaran yang dipadam dibaca semula oleh pelayan
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/superadmin";
     } catch {
       router.push("/superadmin");

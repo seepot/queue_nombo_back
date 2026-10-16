@@ -33,6 +33,17 @@ export type TenantFeatureFlags = {
   enablePwaManager?: boolean;
 };
 
+/** Permohonan pemadaman akaun organisasi (PDPA). Dilaksanakan oleh superadmin selepas tempoh ihsan. */
+export type TenantDeletionRequest = {
+  status: "PENDING";
+  requestedAt: string;
+  requestedBy: string;
+  requestedByName?: string;
+  reason?: string | null;
+  /** Tarikh paling awal pemadaman boleh dilaksanakan (ISO) */
+  scheduledFor: string;
+};
+
 /** `Tenant.settings` */
 export type TenantSettings = {
   theme?: string;
@@ -44,6 +55,7 @@ export type TenantSettings = {
   featureFlags?: TenantFeatureFlags;
   whatsapp?: WhatsAppSettings;
   webhookUrl?: string;
+  deletionRequest?: TenantDeletionRequest;
 };
 
 /** Tetapan global platform yang disimpan dalam `AuditLog.details` (PLATFORM_GLOBAL_SETTINGS_UPDATED). */

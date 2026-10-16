@@ -64,6 +64,7 @@ export default async function BillingPage() {
       tenantName={tenant?.name || "Organisasi Utama (Superadmin View)"}
       sandboxEnabled={isBillingSandboxEnabled()}
       gatewayConfigured={isPaymentGatewayConfigured()}
+      tenantSlug={user.tenantId ? tenant?.slug || null : null}
     />
   );
 }

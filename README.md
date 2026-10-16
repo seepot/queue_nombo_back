@@ -34,6 +34,8 @@ Dibina dengan **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS 4**, *
 - **Langganan & kuota**: percubaan 14 hari, tempoh ihsan 7 hari selepas tamat, sekatan automatik pada API operasi dan kiosk apabila langganan tamat, kuota cawangan / kaunter / paparan dikuatkuasakan, pembatalan langganan, peringatan e-mel sebelum tamat.
 - **Bil**: FPX / kad melalui ToyyibPay, webhook yang disahkan semula melalui API gerbang, mod sandbox untuk pembangunan, invois & resit.
 - **Keselamatan**: had percubaan log masuk (anti brute force), had kadar pada API awam, lupa / tetap semula kata laluan melalui e-mel, jejak audit.
+- **Subdomain tenant**: `klinik-a.quenombo.com/kiosk` menghala ke kiosk tenant tersebut (tetapkan `NEXT_PUBLIC_APP_DOMAIN`); `<slug>.localhost` disokong semasa pembangunan.
+- **Data & privasi (PDPA)**: eksport semua data organisasi dalam JSON dan permohonan pemadaman akaun dengan tempoh ihsan 30 hari, dari halaman Langganan.
 - **Lain-lain**: notifikasi WhatsApp, pengumuman suara, ramalan AI beban kaunter, penyegerakan luar talian, PWA.
 
 ---
@@ -70,6 +72,7 @@ Lihat `.env.example` untuk senarai penuh. Ringkasan:
 | `REDIS_URL` | Cache, urutan giliran, PIN pairing, had kadar, token tetapan semula |
 | `AUTH_SECRET`, `AUTH_URL` | NextAuth v5 |
 | `NEXT_PUBLIC_APP_URL` | URL awam aplikasi (digunakan dalam e-mel & URL kembali gerbang) |
+| `NEXT_PUBLIC_APP_DOMAIN` | Domain induk untuk subdomain tenant (cth. `quenombo.com`); kosong untuk mematikan |
 | `REALTIME_SERVICE_URL`, `REALTIME_SERVICE_SECRET` | Perkhidmatan WebSocket |
 | `CRON_SECRET` | Melindungi `GET /api/cron/subscriptions` |
 | `BILLING_WEBHOOK_SECRET` | Header `x-billing-secret` untuk webhook generik / simulasi |
@@ -92,6 +95,7 @@ TEST_BASE_URL=http://localhost:3000 node scripts/test-subscription-cancel.js
 TEST_BASE_URL=http://localhost:3000 node scripts/test-rate-limit.js
 TEST_BASE_URL=http://localhost:3000 node scripts/test-password-reset.js
 TEST_BASE_URL=http://localhost:3000 node scripts/test-billing-security.js
+TEST_BASE_URL=http://localhost:3000 node scripts/test-tenant-subdomain-pdpa.js
 ```
 
 Skrip `test-*.js` lain menguji modul khusus (pendaftaran tenant, superadmin, peranti, WhatsApp, dsb.).

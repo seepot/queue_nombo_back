@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
 import Link from "next/link";
@@ -43,12 +43,14 @@ export default function BillingClient({
   tenantName,
   sandboxEnabled = false,
   gatewayConfigured = false,
+  tenantSlug = null,
 }: {
   subscription: SubscriptionInfo;
   usage: QuotaUsage;
   tenantName: string;
   sandboxEnabled?: boolean;
   gatewayConfigured?: boolean;
+  tenantSlug?: string | null;
 }) {
   const router = useRouter();
   const { language, t } = useLanguage();
@@ -63,6 +65,61 @@ export default function BillingClient({
   const [subscriptionStatus, setSubscriptionStatus] = useState(subscription.status);
   // Masa semasa diambil sekali semasa pemasangan supaya render kekal tulen
   const [renderedAt] = useState(() => Date.now());
+
+  // Data & Privasi (PDPA)
+  const [deletionRequest, setDeletionRequest] = useState<{ requestedAt: string; scheduledFor: string } | null>(null);
+  const [deletionLoading, setDeletionLoading] = useState(false);
+  const [deletionConfirm, setDeletionConfirm] = useState("");
+  const [deletionReason, setDeletionReason] = useState("");
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    let cancelled = false;
+    fetch("/api/tenant/deletion-request", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.success) setDeletionRequest(d.deletionRequest || null);
+      })
+      .catch(() => {
+        // abaikan
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSlug]);
+
+  const handleDeletion = async (action: "REQUEST" | "CANCEL") => {
+    setDeletionLoading(true);
+    setFeedbackMessage(null);
+    try {
+      const res = await fetch("/api/tenant/deletion-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "REQUEST" ? { action, confirmSlug: deletionConfirm, reason: deletionReason } : { action }
+        ),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDeletionRequest(data.deletionRequest || null);
+        setDeletionConfirm("");
+        setDeletionReason("");
+        setFeedbackMessage({ type: "success", text: data.message });
+      } else {
+        setFeedbackMessage({
+          type: "error",
+          text: data.message || (language === "en" ? "Request failed." : "Permintaan gagal."),
+        });
+      }
+    } catch {
+      setFeedbackMessage({
+        type: "error",
+        text: language === "en" ? "Network connection error." : "Ralat sambungan rangkaian.",
+      });
+    } finally {
+      setDeletionLoading(false);
+    }
+  };
 
   // Invoices state
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
@@ -608,6 +665,82 @@ export default function BillingClient({
       )}
 
       {/* Checkout & Payment Gateway Modal */}
+      {/* Data & Privasi (PDPA) */}
+      {tenantSlug && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{language === "en" ? "Data & Privacy" : "Data & Privasi"}</h2>
+            <p className="text-xs text-gray-500">
+              {language === "en"
+                ? "Export all organisation data or request account deletion (PDPA). Deletion is carried out after a 30-day grace period."
+                : "Eksport semua data organisasi atau mohon pemadaman akaun (PDPA). Pemadaman dilaksanakan selepas tempoh ihsan 30 hari."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/api/tenant/export"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              ⬇️ {language === "en" ? "Export data (JSON)" : "Eksport data (JSON)"}
+            </a>
+          </div>
+
+          {deletionRequest ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {language === "en"
+                  ? `Account deletion requested on ${new Date(deletionRequest.requestedAt).toLocaleDateString("en-US")}. Scheduled for ${new Date(deletionRequest.scheduledFor).toLocaleDateString("en-US")}.`
+                  : `Permohonan pemadaman akaun direkodkan pada ${new Date(deletionRequest.requestedAt).toLocaleDateString("ms-MY")}. Dijadualkan ${new Date(deletionRequest.scheduledFor).toLocaleDateString("ms-MY")}.`}
+              </span>
+              <button
+                type="button"
+                disabled={deletionLoading}
+                onClick={() => handleDeletion("CANCEL")}
+                className="rounded-xl bg-slate-900 px-4 py-2 font-bold text-white hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+              >
+                {deletionLoading ? "..." : language === "en" ? "Cancel request" : "Batalkan permohonan"}
+              </button>
+            </div>
+          ) : (
+            <details className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-xs">
+              <summary className="cursor-pointer font-bold text-rose-800">
+                {language === "en" ? "Request account deletion" : "Mohon pemadaman akaun"}
+              </summary>
+              <div className="mt-3 space-y-3">
+                <p className="text-rose-900">
+                  {language === "en"
+                    ? `Type your organisation slug "${tenantSlug}" to confirm. All branches, users, tickets and invoices will be deleted after the grace period.`
+                    : `Taip slug organisasi "${tenantSlug}" untuk mengesahkan. Semua cawangan, pengguna, tiket dan invois akan dipadam selepas tempoh ihsan.`}
+                </p>
+                <input
+                  type="text"
+                  value={deletionConfirm}
+                  onChange={(e) => setDeletionConfirm(e.target.value)}
+                  placeholder={tenantSlug}
+                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-400"
+                />
+                <textarea
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  rows={2}
+                  placeholder={language === "en" ? "Reason (optional)" : "Sebab (pilihan)"}
+                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-400"
+                />
+                <button
+                  type="button"
+                  disabled={deletionLoading || deletionConfirm.trim().toLowerCase() !== tenantSlug}
+                  onClick={() => handleDeletion("REQUEST")}
+                  className="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  {deletionLoading ? "..." : language === "en" ? "Submit deletion request" : "Hantar permohonan pemadaman"}
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
       {selectedPlanForModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 space-y-6 animate-in zoom-in-95 font-sans">

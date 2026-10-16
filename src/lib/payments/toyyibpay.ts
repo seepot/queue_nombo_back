@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+
 /**
  * Penyesuai gerbang pembayaran ToyyibPay (FPX / Kad) untuk Malaysia.
+ * Rujukan: https://toyyibpay.com/apireference/
  *
  * Pemboleh ubah persekitaran:
  *  - TOYYIBPAY_SECRET_KEY     : userSecretKey akaun ToyyibPay
@@ -19,25 +22,62 @@ export interface CreateBillParams {
   returnUrl: string;
   callbackUrl: string;
   channel?: ToyyibPayChannel;
+  /** Tempoh sah bil dalam hari (1-100). Lalai 3 hari. */
+  expiryDays?: number;
 }
 
+/** Satu rekod daripada getBillTransactions (medan mengikut dokumentasi rasmi). */
 export interface ToyyibPayBillTransaction {
   billName?: string;
-  billpaymentStatus: string; // "1" berjaya, "2" belum selesai, "3" gagal
-  billpaymentAmount: string; // cth "99.00"
-  billpaymentInvoiceNo?: string;
-  billExternalReferenceNo?: string;
-  billpaymentDate?: string;
-  billpaymentChannel?: string;
+  billDescription?: string;
   billTo?: string;
+  billEmail?: string;
+  billPhone?: string;
+  billStatus?: string;
+  billpaymentStatus: string; // "1" berjaya, "2"/"4" belum selesai, "3" gagal
+  billpaymentChannel?: string; // cth "FPX", "Credit Card", "DuitNow QR"
+  billpaymentAmount: string; // dalam RM, cth "99.00"
+  billpaymentInvoiceNo?: string; // cth "TP5793119399122400030321"
+  billpaymentSettlement?: string;
+  billpaymentSettlementDate?: string;
+  SettlementReferenceNo?: string;
+  billPaymentDate?: string; // cth "02-03-2021 16:24:25"
+  billExternalReferenceNo?: string;
 }
 
 export interface ToyyibPayVerification {
   paid: boolean;
-  status: "SUCCESS" | "PENDING" | "FAILED" | "UNKNOWN";
+  /**
+   * SUCCESS  : bayaran disahkan & jumlah sepadan
+   * PENDING  : transaksi wujud tetapi belum selesai (status 2/4)
+   * FAILED   : semua percubaan gagal (status 3)
+   * MISMATCH : bayaran berjaya tetapi jumlah TIDAK sepadan — jangan aktifkan, perlu semakan manual
+   * UNKNOWN  : tiada transaksi direkodkan untuk bil ini
+   */
+  status: "SUCCESS" | "PENDING" | "FAILED" | "MISMATCH" | "UNKNOWN";
   ref?: string;
   amount?: number;
   channel?: string;
+}
+
+/**
+ * Medan callback (POST form-urlencoded) yang dihantar ToyyibPay ke billCallbackUrl.
+ * Status dalam callback TIDAK boleh dipercayai sepenuhnya; sahkan semula melalui API.
+ */
+export interface ToyyibPayCallbackBody {
+  refno?: string;
+  status?: string; // "1" berjaya, "2" belum selesai, "3" gagal
+  reason?: string;
+  billcode?: string;
+  order_id?: string; // billExternalReferenceNo kita (invoiceNo)
+  amount?: string;
+  transaction_time?: string;
+  hash?: string; // MD5(userSecretKey + status + order_id + refno + "ok")
+  // DuitNow QR sahaja
+  status_id?: string;
+  msg?: string;
+  transaction_id?: string;
+  dnqr_transaction_id?: string;
 }
 
 export function isToyyibPayConfigured(): boolean {
@@ -62,6 +102,24 @@ function sanitizePhone(phone: string): string {
   return digits;
 }
 
+/** billName/billDescription hanya menerima aksara alfanumerik, ruang dan "_" mengikut dokumentasi. */
+function sanitizeText(text: string, maxLength: number): string {
+  return text
+    .replace(/[^A-Za-z0-9 _]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+async function postForm(path: string, fields: Record<string, string>): Promise<string> {
+  const res = await fetch(`${getToyyibPayBaseUrl()}/index.php/api/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(fields),
+  });
+  return res.text();
+}
+
 export async function createToyyibPayBill(
   params: CreateBillParams
 ): Promise<{ billCode: string; paymentUrl: string }> {
@@ -69,11 +127,16 @@ export async function createToyyibPayBill(
     throw new Error("ToyyibPay belum dikonfigurasi (TOYYIBPAY_SECRET_KEY / TOYYIBPAY_CATEGORY_CODE).");
   }
 
-  const body = new URLSearchParams({
+  const expiryDays = Math.min(100, Math.max(1, Math.round(params.expiryDays ?? 3)));
+
+  // Nota: billChargeToCustomer sengaja DIKOSONGKAN supaya caj FPX/kad ditanggung pemilik bil.
+  // Dengan itu jumlah yang dibayar pelanggan sentiasa sama dengan jumlah invois kita,
+  // dan semakan "jumlah mesti sepadan" semasa pengesahan tidak gagal.
+  const raw = await postForm("createBill", {
     userSecretKey: process.env.TOYYIBPAY_SECRET_KEY as string,
     categoryCode: process.env.TOYYIBPAY_CATEGORY_CODE as string,
-    billName: params.billName.slice(0, 30),
-    billDescription: params.billDescription.slice(0, 100),
+    billName: sanitizeText(params.billName, 30),
+    billDescription: sanitizeText(params.billDescription, 100),
     billPriceSetting: "1",
     billPayorInfo: "1",
     billAmount: String(Math.round(params.amountMyr * 100)),
@@ -87,21 +150,22 @@ export async function createToyyibPayBill(
     billSplitPaymentArgs: "",
     billPaymentChannel: channelCode(params.channel),
     billContentEmail: "Terima kasih kerana melanggan QueNombo.",
-    billChargeToCustomer: "1",
+    billExpiryDays: String(expiryDays),
   });
 
-  const res = await fetch(`${getToyyibPayBaseUrl()}/index.php/api/createBill`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  const raw = await res.text();
+  // createBill membalas HTTP 200 untuk kejayaan DAN kegagalan:
+  //  - berjaya : [{"BillCode":"gcbhict9"}]
+  //  - gagal   : {"status":"error","msg":"..."} atau teks biasa cth [KEY-DID-NOT-EXIST-OR-USER-IS-NOT-ACTIVE]
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`Respons ToyyibPay tidak sah: ${raw.slice(0, 200)}`);
+    throw new Error(`ToyyibPay gagal mencipta bil: ${raw.trim().slice(0, 200)}`);
+  }
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const err = parsed as { status?: string; msg?: string };
+    throw new Error(`ToyyibPay gagal mencipta bil: ${err.msg || err.status || raw.slice(0, 200)}`);
   }
 
   const billCode = Array.isArray(parsed) ? parsed[0]?.BillCode : undefined;
@@ -112,14 +176,15 @@ export async function createToyyibPayBill(
   return { billCode, paymentUrl: `${getToyyibPayBaseUrl()}/${billCode}` };
 }
 
+/**
+ * Senarai transaksi bagi satu bil. userSecretKey disertakan supaya butiran pembayar
+ * dipulangkan; tanpa kunci pemilik, API memulangkan medan kosong.
+ * API membalas teks biasa "No data found!" jika tiada transaksi -> [].
+ */
 export async function getToyyibPayBillTransactions(billCode: string): Promise<ToyyibPayBillTransaction[]> {
-  const body = new URLSearchParams({ billCode });
-  const res = await fetch(`${getToyyibPayBaseUrl()}/index.php/api/getBillTransactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const raw = await res.text();
+  const fields: Record<string, string> = { billCode };
+  if (process.env.TOYYIBPAY_SECRET_KEY) fields.userSecretKey = process.env.TOYYIBPAY_SECRET_KEY;
+  const raw = await postForm("getBillTransactions", fields);
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as ToyyibPayBillTransaction[]) : [];
@@ -149,7 +214,7 @@ export async function verifyToyyibPayPayment(
       console.error(
         `[ToyyibPay] Jumlah tidak sepadan untuk bil ${billCode}: dijangka ${expectedAmountMyr}, diterima ${amount}`
       );
-      return { paid: false, status: "FAILED", amount, ref: success.billpaymentInvoiceNo };
+      return { paid: false, status: "MISMATCH", amount, ref: success.billpaymentInvoiceNo };
     }
     return {
       paid: true,
@@ -160,8 +225,33 @@ export async function verifyToyyibPayPayment(
     };
   }
 
-  const pending = transactions.some((t) => String(t.billpaymentStatus) === "2");
+  const pending = transactions.some((t) => ["2", "4"].includes(String(t.billpaymentStatus)));
   if (pending) return { paid: false, status: "PENDING" };
 
   return { paid: false, status: "FAILED" };
+}
+
+/**
+ * Kira hash callback mengikut dokumentasi: MD5(userSecretKey + status + order_id + refno + "ok").
+ */
+export function computeToyyibPayCallbackHash(
+  body: Pick<ToyyibPayCallbackBody, "status" | "order_id" | "refno">,
+  secretKey = process.env.TOYYIBPAY_SECRET_KEY || ""
+): string {
+  return createHash("md5")
+    .update(`${secretKey}${body.status ?? ""}${body.order_id ?? ""}${body.refno ?? ""}ok`)
+    .digest("hex");
+}
+
+/**
+ * Sahkan hash callback. Pulangkan:
+ *  - "valid"   : hash disertakan dan sepadan
+ *  - "invalid" : hash disertakan tetapi tidak sepadan (tolak callback)
+ *  - "missing" : tiada hash dalam callback (bergantung sepenuhnya pada pengesahan API)
+ */
+export function verifyToyyibPayCallbackHash(body: ToyyibPayCallbackBody): "valid" | "invalid" | "missing" {
+  if (!body.hash) return "missing";
+  if (!process.env.TOYYIBPAY_SECRET_KEY) return "missing";
+  const expected = computeToyyibPayCallbackHash(body);
+  return expected.toLowerCase() === String(body.hash).toLowerCase() ? "valid" : "invalid";
 }

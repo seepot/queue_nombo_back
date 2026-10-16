@@ -33,6 +33,9 @@ export type TenantFeatureFlags = {
   enablePwaManager?: boolean;
 };
 
+/** Tempoh ihsan (hari) sebelum superadmin boleh melaksanakan pemadaman akaun (PDPA). */
+export const TENANT_DELETION_GRACE_DAYS = 30;
+
 /** Permohonan pemadaman akaun organisasi (PDPA). Dilaksanakan oleh superadmin selepas tempoh ihsan. */
 export type TenantDeletionRequest = {
   status: "PENDING";

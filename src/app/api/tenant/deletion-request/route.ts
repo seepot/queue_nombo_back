@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { readJsonObject, type TenantDeletionRequest, type TenantSettings } from "@/lib/settings";
+import {
+  readJsonObject,
+  TENANT_DELETION_GRACE_DAYS as DELETION_GRACE_DAYS,
+  type TenantDeletionRequest,
+  type TenantSettings,
+} from "@/lib/settings";
 import { requireVerifiedEmailForBilling } from "@/lib/email-verification";
 import { sendMail } from "@/lib/mailer";
-
-/** Tempoh ihsan sebelum superadmin boleh melaksanakan pemadaman (PDPA). */
-export const DELETION_GRACE_DAYS = 30;
 
 type SessionUser = { id: string; role?: string | null; tenantId?: string | null; name?: string | null };
 

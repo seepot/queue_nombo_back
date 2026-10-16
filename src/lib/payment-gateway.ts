@@ -254,18 +254,14 @@ export async function markTransactionFailed(transactionId: string, gatewayRef?: 
   });
 }
 
-export type ReconcileStatus = "SUCCESS" | "PENDING" | "FAILED" | "MISMATCH" | "UNKNOWN";
+export type ReconcileStatus = "SUCCESS" | "PENDING" | "FAILED" | "UNKNOWN";
 
 /**
- * Semak semula transaksi terus dengan gerbang pembayaran dan aktifkan langganan jika
- * pembayaran disahkan. Selamat dipanggil berulang kali (webhook, halaman invois, /api/billing/verify).
- *
- * Transaksi ToyyibPay berstatus FAILED turut disemak semula kerana pelanggan boleh
- * mencuba bayar semula bil yang sama selepas percubaan FPX yang gagal.
+ * Semak semula transaksi PENDING terus dengan gerbang pembayaran dan
+ * aktifkan langganan jika pembayaran disahkan. Selamat dipanggil berulang kali.
  */
 export async function reconcilePendingTransaction(
-  transactionId: string,
-  fallbackGatewayRef?: string
+  transactionId: string
 ): Promise<{ status: ReconcileStatus; transactionId: string }> {
   const transaction = await prisma.paymentTransaction.findUnique({ where: { id: transactionId } });
   if (!transaction) {
@@ -273,9 +269,10 @@ export async function reconcilePendingTransaction(
   }
 
   if (transaction.status === "SUCCESS") return { status: "SUCCESS", transactionId };
+  if (transaction.status === "FAILED") return { status: "FAILED", transactionId };
 
   if (transaction.gatewayProvider !== "TOYYIBPAY" || !transaction.billCode) {
-    return { status: transaction.status === "FAILED" ? "FAILED" : "PENDING", transactionId };
+    return { status: "PENDING", transactionId };
   }
 
   const verification = await verifyToyyibPayPayment(transaction.billCode, Number(transaction.amount));
@@ -283,28 +280,16 @@ export async function reconcilePendingTransaction(
   if (verification.paid) {
     await handleSuccessfulPayment({
       transactionId,
-      gatewayRef: verification.ref || fallbackGatewayRef,
+      gatewayRef: verification.ref,
       paymentMethod: channelToPaymentMethod(verification.channel, transaction.paymentMethod),
     });
     return { status: "SUCCESS", transactionId };
   }
 
-  if (verification.status === "MISMATCH") {
-    // Bayaran diterima tetapi jumlah tidak sepadan: JANGAN aktifkan, kekalkan PENDING untuk semakan manual.
-    console.error(
-      `[Billing] Jumlah tidak sepadan untuk ${transaction.invoiceNo} (bil ${transaction.billCode}): ` +
-        `dijangka RM${Number(transaction.amount).toFixed(2)}, diterima RM${(verification.amount ?? 0).toFixed(2)}`
-    );
-    return { status: "MISMATCH", transactionId };
-  }
-
   if (verification.status === "FAILED") {
-    if (transaction.status !== "FAILED") {
-      await markTransactionFailed(transactionId, verification.ref);
-    }
+    await markTransactionFailed(transactionId, verification.ref);
     return { status: "FAILED", transactionId };
   }
 
-  if (transaction.status === "FAILED") return { status: "FAILED", transactionId };
   return { status: verification.status === "PENDING" ? "PENDING" : "UNKNOWN", transactionId };
 }

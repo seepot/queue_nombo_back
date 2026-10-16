@@ -40,15 +40,10 @@ export default async function InvoiceReceiptPage({
   }
 
   // Selepas kembali dari gerbang: sahkan semula status terus dengan ToyyibPay
-  // (termasuk FAILED, kerana pelanggan boleh cuba bayar semula bil yang sama).
-  if (
-    (transaction.status === "PENDING" || transaction.status === "FAILED") &&
-    transaction.gatewayProvider === "TOYYIBPAY" &&
-    transaction.billCode
-  ) {
+  if (transaction.status === "PENDING" && transaction.gatewayProvider === "TOYYIBPAY" && transaction.billCode) {
     try {
       const result = await reconcilePendingTransaction(transaction.id);
-      if (result.status === "SUCCESS" || result.status === "FAILED") {
+      if (result.status !== "PENDING" && result.status !== "UNKNOWN") {
         transaction = (await loadTransaction()) ?? transaction;
       }
     } catch (error) {
